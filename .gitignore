@@ -1,0 +1,5 @@
+echo node_modules/ > .gitignore
+echo client/node_modules/ >> .gitignore
+echo server/pattes_douces.db >> .gitignore
+echo .env >> .gitignore
+node_modules

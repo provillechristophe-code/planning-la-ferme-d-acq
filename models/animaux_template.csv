@@ -1,0 +1,9 @@
+client_id,Nom,Espèce,Race,Âge,Poids,Notes
+1,Milo,Chat,Persan,3,4.5,Allergie au lait
+1,Luna,Chat,Siamois,2,3.8,Timide
+2,Rex,Chien,Labrador,5,32,Très amical
+2,Max,Chien,Berger Allemand,4,38,Entraîné
+3,Nemo,Poisson,Néon,1,0.05,Aquarium tropical
+3,Tweety,Oiseau,Canari,2,0.03,Très vocal
+4,Bugs,Lapin,Bélier,3,2.5,Adore les carottes
+5,Piou,Cochon d'Inde,Péruvienne,1,1.2,Sociable
