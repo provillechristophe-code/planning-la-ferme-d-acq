@@ -28,53 +28,71 @@ var s = {
   filterRow: { display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
   filterBtn: { padding: '8px 16px', borderRadius: 50, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, fontWeight: 600, color: '#64748b', cursor: 'pointer' },
   filterBtnActive: { padding: '8px 16px', borderRadius: 50, border: '1px solid #6366f1', background: '#eef2ff', fontSize: 13, fontWeight: 700, color: '#6366f1', cursor: 'pointer' },
-  resCard: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s' },
+  resCard: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   resLeft: { display: 'flex', alignItems: 'center', gap: 14 },
   resAvatar: { width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 },
   resName: { fontSize: 14, fontWeight: 700, color: '#1e293b' },
   resMeta: { fontSize: 12, color: '#64748b', marginTop: 2 },
   resRight: { display: 'flex', alignItems: 'center', gap: 14, textAlign: 'right' },
   resDates: { fontSize: 13, color: '#475569' },
-  resDateIcon: { color: '#94a3b8', fontSize: 11 },
   resPrice: { fontSize: 16, fontWeight: 800, color: '#1e293b' },
   statusBadge: { padding: '4px 12px', borderRadius: 50, fontSize: 11, fontWeight: 700, display: 'inline-block' },
   btnDelete: { background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   countBadge: { background: '#eef2ff', color: '#6366f1', padding: '4px 12px', borderRadius: 50, fontSize: 12, fontWeight: 700 },
   emptyState: { padding: 50, textAlign: 'center', color: '#94a3b8' },
-  loading: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 80, color: '#94a3b8' },
-  spinner: { width: 40, height: 40, border: '4px solid #e2e8f0', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: 16 },
   durationBadge: { background: '#f0fdf4', color: '#15803d', padding: '3px 10px', borderRadius: 50, fontSize: 11, fontWeight: 700, display: 'inline-block' }
 };
 function Reservations() {
   var [reservations, setReservations] = useState([]);
   var [animals, setAnimals] = useState([]);
   var [clients, setClients] = useState([]);
-    var [form, setForm] = useState({ animal_id: '', client_id: '', box_id: '', check_in: '', check_out: '', daily_rate: '', services: '', notes: '', status: 'confirmed' });
   var [boxes, setBoxes] = useState([]);
   var [loading, setLoading] = useState(true);
   var [showForm, setShowForm] = useState(false);
   var [filter, setFilter] = useState('all');
-    var [defaultRate, setDefaultRate] = useState(30);
+  var [defaultRate, setDefaultRate] = useState(30);
+  var makeInitialForm = function(rate) {
+    return {
+      animal_id: '',
+      client_id: '',
+      box_id: '',
+      check_in: '',
+      check_out: '',
+      daily_rate: rate !== undefined && rate !== null ? String(rate) : '',
+      services: '',
+      notes: '',
+      status: 'confirmed'
+    };
+  };
+  var [form, setForm] = useState(makeInitialForm(''));
   useEffect(function() {
     fetchData();
   }, []);
   var fetchData = function() {
-   
-      setLoading(false);
-        Promise.all([
+    Promise.all([
       axios.get('/api/reservations'),
       axios.get('/api/animals'),
       axios.get('/api/clients'),
-      axios.get('/api/config/boxes')
+      axios.get('/api/config/boxes'),
+      axios.get('/api/config/config')
     ]).then(function(results) {
       setReservations(results[0].data);
       setAnimals(results[1].data);
       setClients(results[2].data);
-          setBoxes(results[3].data);
-                axios.get('/api/config/config').then(function(configRes) {
-        if (configRes.data && configRes.data.default_daily_rate) {
-          setDefaultRate(configRes.data.default_daily_rate);
+      setBoxes(results[3].data);
+      var rate = 30;
+      if (results[4] && results[4].data && results[4].data.default_daily_rate !== undefined && results[4].data.default_daily_rate !== null) {
+        rate = results[4].data.default_daily_rate;
+      }
+      setDefaultRate(rate);
+      setForm(function(prev) {
+        if (prev.daily_rate !== '' && prev.daily_rate !== undefined && prev.daily_rate !== null) {
+          return prev;
         }
+        var newForm = {};
+        Object.keys(prev).forEach(function(k) { newForm[k] = prev[k]; });
+        newForm.daily_rate = String(rate);
+        return newForm;
       });
       setLoading(false);
     }).catch(function(err) {
@@ -82,10 +100,13 @@ function Reservations() {
       setLoading(false);
     });
   };
+  var resetForm = function() {
+    setForm(makeInitialForm(defaultRate));
+  };
   var handleSubmit = function(e) {
     e.preventDefault();
     axios.post('/api/reservations', form).then(function() {
-      setForm({ animal_id: '', client_id: '', box_id: '', check_in: '', check_out: '', daily_rate: '', services: '', notes: '', status: 'confirmed' });
+      resetForm();
       setShowForm(false);
       fetchData();
       alert('Réservation créée !');
@@ -112,18 +133,15 @@ function Reservations() {
   };
   var getAnimalName = function(id) {
     var animal = animals.find(function(a) { return a.id === id; });
-    if (animal && animal.name) return animal.name;
-    return 'Animal #' + id;
+    return animal && animal.name ? animal.name : 'Animal #' + id;
   };
   var getAnimalSpecies = function(id) {
     var animal = animals.find(function(a) { return a.id === id; });
-    if (animal && animal.species) return animal.species;
-    return '';
+    return animal && animal.species ? animal.species : '';
   };
   var getClientName = function(id) {
     var client = clients.find(function(c) { return c.id === id; });
-    if (client && client.name) return client.name;
-    return 'Client #' + id;
+    return client && client.name ? client.name : 'Client #' + id;
   };
   var getSpeciesIcon = function(species) {
     var sp = (species || '').toLowerCase();
@@ -139,14 +157,14 @@ function Reservations() {
   };
   var getStatusStyle = function(status) {
     if (status === 'confirmed') return { background: '#ecfdf5', color: '#059669' };
-    if (status === 'pending') return { background: '#fffbeb', color: '#d97706' };
-    if (status === 'cancelled') return { background: '#fef2f2', color: '#dc2626' };
+    if (status === 'pending') return { background: '#fdf2f8', color: '#ec4899' };
+    if (status === 'cancelled') return { background: '#f1f5f9', color: '#94a3b8' };
     return { background: '#f1f5f9', color: '#64748b' };
   };
   var getStatusLabel = function(status) {
-    if (status === 'confirmed') return '✓ Confirmée';
-    if (status === 'pending') return '⏳ En attente';
-    if (status === 'cancelled') return '✗ Annulée';
+    if (status === 'confirmed') return '🟢 Habitué';
+    if (status === 'pending') return '🩷 Nouveau';
+    if (status === 'cancelled') return '⚪ Annulée';
     return status || '—';
   };
   var getDuration = function(checkIn, checkOut) {
@@ -155,10 +173,8 @@ function Reservations() {
     var days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
     return days > 0 ? days : 0;
   };
- 
   var confirmed = reservations.filter(function(r) { return r.status === 'confirmed'; }).length;
   var pending = reservations.filter(function(r) { return r.status === 'pending'; }).length;
-  
   var totalRevenue = reservations.reduce(function(sum, r) {
     var days = getDuration(r.check_in, r.check_out);
     return sum + (days * (parseFloat(r.daily_rate) || 0));
@@ -169,59 +185,32 @@ function Reservations() {
   });
   if (loading) {
     return (
-      <div style={s.loading}>
-        <div style={s.spinner}></div>
-        <p>Chargement des réservations...</p>
-        <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
+      <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8' }}>
+        Chargement des réservations...
       </div>
     );
   }
   return (
     <div style={s.page}>
-      <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
-      {/* Header */}
       <div style={s.headerRow}>
         <div>
           <h2 style={s.headerTitle}>📋 Réservations</h2>
           <p style={s.headerSub}>Gérez les séjours de vos pensionnaires</p>
         </div>
-        <button style={s.btnAdd} onClick={function() { setShowForm(!showForm); }}>
+        <button style={s.btnAdd} onClick={function() {
+          if (!showForm) resetForm();
+          setShowForm(!showForm);
+        }}>
           {showForm ? '✕ Fermer' : '+ Nouvelle réservation'}
         </button>
       </div>
-      {/* Stats */}
       <div style={s.statsRow}>
-        <div style={s.statCard}>
-          <div style={Object.assign({}, s.statIcon, { background: '#eef2ff' })}>📋</div>
-          <div>
-            <div style={s.statValue}>{reservations.length}</div>
-            <div style={s.statLabel}>Total</div>
-          </div>
-        </div>
-        <div style={s.statCard}>
-          <div style={Object.assign({}, s.statIcon, { background: '#ecfdf5' })}>✓</div>
-          <div>
-            <div style={Object.assign({}, s.statValue, { color: '#059669' })}>{confirmed}</div>
-            <div style={s.statLabel}>Confirmées</div>
-          </div>
-        </div>
-        <div style={s.statCard}>
-          <div style={Object.assign({}, s.statIcon, { background: '#fffbeb' })}>⏳</div>
-          <div>
-            <div style={Object.assign({}, s.statValue, { color: '#d97706' })}>{pending}</div>
-            <div style={s.statLabel}>En attente</div>
-          </div>
-        </div>
-        <div style={s.statCard}>
-          <div style={Object.assign({}, s.statIcon, { background: '#f0fdf4' })}>💰</div>
-          <div>
-            <div style={Object.assign({}, s.statValue, { color: '#15803d' })}>{totalRevenue.toFixed(0)}€</div>
-            <div style={s.statLabel}>Revenu estimé</div>
-          </div>
-        </div>
+        <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#eef2ff' })}>📋</div><div><div style={s.statValue}>{reservations.length}</div><div style={s.statLabel}>Total</div></div></div>
+        <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#ecfdf5' })}>🟢</div><div><div style={Object.assign({}, s.statValue, { color: '#059669' })}>{confirmed}</div><div style={s.statLabel}>Habitués</div></div></div>
+        <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#fdf2f8' })}>🩷</div><div><div style={Object.assign({}, s.statValue, { color: '#ec4899' })}>{pending}</div><div style={s.statLabel}>Nouveaux</div></div></div>
+        <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#f0fdf4' })}>💰</div><div><div style={Object.assign({}, s.statValue, { color: '#15803d' })}>{totalRevenue.toFixed(0)}€</div><div style={s.statLabel}>Revenu estimé</div></div></div>
       </div>
       <div style={showForm ? s.grid : {}}>
-        {/* Formulaire */}
         {showForm && (
           <div style={s.card}>
             <div style={s.cardHeader}>
@@ -237,18 +226,14 @@ function Reservations() {
                   <label style={s.label}>Client</label>
                   <select style={s.select} value={form.client_id} onChange={function(e) { updateField('client_id', e.target.value); }} required>
                     <option value="">-- Sélectionner le client --</option>
-                    {clients.map(function(c) {
-                      return <option key={c.id} value={c.id}>{c.name}</option>;
-                    })}
+                    {clients.map(function(c) { return <option key={c.id} value={c.id}>{c.name}</option>; })}
                   </select>
                 </div>
                 <div style={s.formGroup}>
                   <label style={s.label}>Animal</label>
                   <select style={s.select} value={form.animal_id} onChange={function(e) { updateField('animal_id', e.target.value); }} required>
                     <option value="">-- Sélectionner l'animal --</option>
-                    {animals.map(function(a) {
-                      return <option key={a.id} value={a.id}>{a.name} ({a.species})</option>;
-                    })}
+                    {animals.map(function(a) { return <option key={a.id} value={a.id}>{a.name} ({a.species})</option>; })}
                   </select>
                 </div>
                 <div style={s.row2}>
@@ -257,8 +242,8 @@ function Reservations() {
                     <input style={s.input} type="date" value={form.check_in} onChange={function(e) { updateField('check_in', e.target.value); }} required />
                   </div>
                   <div style={s.formGroup}>
-                   <label style={s.label}>💶 Tarif journalier (€)</label>
-<input style={s.input} type="number" step="0.01" value={form.daily_rate || defaultRate} onChange={function(e) { updateField('daily_rate', e.target.value); }} placeholder={defaultRate + ''} required />
+                    <label style={s.label}>📅 Départ</label>
+                    <input style={s.input} type="date" value={form.check_out} onChange={function(e) { updateField('check_out', e.target.value); }} required />
                   </div>
                 </div>
                 {form.check_in && form.check_out && getDuration(form.check_in, form.check_out) > 0 && (
@@ -268,16 +253,21 @@ function Reservations() {
                       <span> • Total estimé : {(getDuration(form.check_in, form.check_out) * parseFloat(form.daily_rate)).toFixed(2)}€</span>
                     )}
                   </div>
-                )}                <div style={s.formGroup}>
- <label style={s.label}>📦 Box</label>
-<select style={s.select} value={form.box_id || ''} onChange={function(e) {
-  var selectedBox = boxes.find(function(b) { return String(b.id) === String(e.target.value); });
-  var newForm = {};
-  Object.keys(form).forEach(function(k) { newForm[k] = form[k]; });
-  newForm.box_id = e.target.value;
-  if (selectedBox) { newForm.daily_rate = selectedBox.daily_rate; }
-  setForm(newForm);
-}}>
+                )}
+                <div style={s.formGroup}>
+                  <label style={s.label}>📦 Box</label>
+                  <select
+                    style={s.select}
+                    value={form.box_id || ''}
+                    onChange={function(e) {
+                      var selectedBox = boxes.find(function(b) { return String(b.id) === String(e.target.value); });
+                      var newForm = {};
+                      Object.keys(form).forEach(function(k) { newForm[k] = form[k]; });
+                      newForm.box_id = e.target.value;
+                      newForm.daily_rate = selectedBox ? String(selectedBox.daily_rate) : String(defaultRate);
+                      setForm(newForm);
+                    }}
+                  >
                     <option value="">-- Choisir un box --</option>
                     {boxes.map(function(b) {
                       return <option key={b.id} value={b.id}>{b.box_number} - {b.box_type} ({b.daily_rate}€/jour)</option>;
@@ -286,7 +276,28 @@ function Reservations() {
                 </div>
                 <div style={s.formGroup}>
                   <label style={s.label}>💶 Tarif journalier (€)</label>
-                  <input style={s.input} type="number" step="0.01" value={form.daily_rate} onChange={function(e) { updateField('daily_rate', e.target.value); }} placeholder="30.00" required />
+                  <input
+                    style={s.input}
+                    type="number"
+                    step="0.01"
+                    value={form.daily_rate}
+                    onChange={function(e) { updateField('daily_rate', e.target.value); }}
+                    placeholder={String(defaultRate)}
+                    required
+                  />
+                </div>
+                <div style={s.formGroup}>
+                  <label style={s.label}>📋 Type de client</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" onClick={function() { updateField('status', 'confirmed'); }} style={{ flex: 1, padding: '12px 8px', borderRadius: 10, border: (form.status || 'confirmed') === 'confirmed' ? '3px solid #059669' : '1px solid #e2e8f0', background: (form.status || 'confirmed') === 'confirmed' ? '#ecfdf5' : '#fff', cursor: 'pointer', textAlign: 'center' }}>
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#10b981', margin: '0 auto 6px auto' }}></div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981' }}>Habitué</div>
+                    </button>
+                    <button type="button" onClick={function() { updateField('status', 'pending'); }} style={{ flex: 1, padding: '12px 8px', borderRadius: 10, border: form.status === 'pending' ? '3px solid #ec4899' : '1px solid #e2e8f0', background: form.status === 'pending' ? '#fdf2f8' : '#fff', cursor: 'pointer', textAlign: 'center' }}>
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#ec4899', margin: '0 auto 6px auto' }}></div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#ec4899' }}>Nouveau</div>
+                    </button>
+                  </div>
                 </div>
                 <div style={s.formGroup}>
                   <label style={s.label}>🛎️ Services supplémentaires</label>
@@ -296,27 +307,11 @@ function Reservations() {
                   <label style={s.label}>📝 Notes</label>
                   <textarea style={s.textarea} value={form.notes} onChange={function(e) { updateField('notes', e.target.value); }} rows="3" placeholder="Informations supplémentaires..." />
                 </div>
-                                <div style={s.formGroup}>
-                  <label style={s.label}>📋 Type de client</label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button type="button" onClick={function() { updateField('status', 'confirmed'); }}
-                      style={{ flex: 1, padding: '12px 8px', borderRadius: 10, border: (form.status || 'confirmed') === 'confirmed' ? '3px solid #059669' : '1px solid #e2e8f0', background: (form.status || 'confirmed') === 'confirmed' ? '#ecfdf5' : '#fff', cursor: 'pointer', textAlign: 'center' }}>
-                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#10b981', margin: '0 auto 6px auto' }}></div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981' }}>Habitué</div>
-                    </button>
-                    <button type="button" onClick={function() { updateField('status', 'pending'); }}
-                      style={{ flex: 1, padding: '12px 8px', borderRadius: 10, border: form.status === 'pending' ? '3px solid #ec4899' : '1px solid #e2e8f0', background: form.status === 'pending' ? '#fdf2f8' : '#fff', cursor: 'pointer', textAlign: 'center' }}>
-                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#ec4899', margin: '0 auto 6px auto' }}></div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#ec4899' }}>Nouveau</div>
-                    </button>
-                  </div>
-                </div>
                 <button type="submit" style={s.btnSubmit}>📋 Créer la réservation</button>
               </form>
             </div>
           </div>
         )}
-        {/* Liste */}
         <div style={s.card}>
           <div style={Object.assign({}, s.cardHeader, { justifyContent: 'space-between' })}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -329,20 +324,11 @@ function Reservations() {
             <span style={s.countBadge}>{filteredReservations.length} résultats</span>
           </div>
           <div style={s.cardBody}>
-            {/* Filtres */}
             <div style={s.filterRow}>
-              <button style={filter === 'all' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('all'); }}>
-                Toutes ({reservations.length})
-              </button>
-              <button style={filter === 'confirmed' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('confirmed'); }}>
-                ✓ Confirmées ({confirmed})
-              </button>
-              <button style={filter === 'pending' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('pending'); }}>
-                ⏳ En attente ({pending})
-              </button>
-              <button style={filter === 'cancelled' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('cancelled'); }}>
-                ✗ Annulées
-              </button>
+              <button style={filter === 'all' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('all'); }}>Toutes ({reservations.length})</button>
+              <button style={filter === 'confirmed' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('confirmed'); }}>🟢 Habitués ({confirmed})</button>
+              <button style={filter === 'pending' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('pending'); }}>🩷 Nouveaux ({pending})</button>
+              <button style={filter === 'cancelled' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('cancelled'); }}>⚪ Annulées</button>
             </div>
             {filteredReservations.length === 0 ? (
               <div style={s.emptyState}>
@@ -359,37 +345,23 @@ function Reservations() {
                   return (
                     <div key={r.id} style={s.resCard}>
                       <div style={s.resLeft}>
-                        <div style={Object.assign({}, s.resAvatar, { background: getSpeciesBg(species) })}>
-                          {getSpeciesIcon(species)}
-                        </div>
+                        <div style={Object.assign({}, s.resAvatar, { background: getSpeciesBg(species) })}>{getSpeciesIcon(species)}</div>
                         <div>
                           <div style={s.resName}>{getAnimalName(r.animal_id)}</div>
-                          <div style={s.resMeta}>
-                            👤 {getClientName(r.client_id)}
-                          </div>
+                          <div style={s.resMeta}>👤 {getClientName(r.client_id)}</div>
                           <div style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <span style={Object.assign({}, s.statusBadge, statusStyle)}>
-                              {getStatusLabel(r.status)}
-                            </span>
-                            <span style={s.durationBadge}>
-                              {days} jour{days > 1 ? 's' : ''}
-                            </span>
+                            <span style={Object.assign({}, s.statusBadge, statusStyle)}>{getStatusLabel(r.status)}</span>
+                            <span style={s.durationBadge}>{days} jour{days > 1 ? 's' : ''}</span>
                           </div>
                         </div>
                       </div>
                       <div style={s.resRight}>
                         <div>
-                          <div style={s.resDates}>
-                            <span style={s.resDateIcon}>📅</span> {r.check_in}
-                          </div>
-                          <div style={s.resDates}>
-                            <span style={s.resDateIcon}>📅</span> {r.check_out}
-                          </div>
+                          <div style={s.resDates}>📅 {r.check_in}</div>
+                          <div style={s.resDates}>📅 {r.check_out}</div>
                           <div style={Object.assign({}, s.resPrice, { marginTop: 6 })}>{total}€</div>
                         </div>
-                        <button style={s.btnDelete} onClick={function() { handleDelete(r.id); }}>
-                          🗑️
-                        </button>
+                        <button style={s.btnDelete} onClick={function() { handleDelete(r.id); }}>🗑️</button>
                       </div>
                     </div>
                   );

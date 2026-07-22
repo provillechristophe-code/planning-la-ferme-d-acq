@@ -8,8 +8,8 @@ router.get('/config', async (req, res) => {
     let config = await get('SELECT * FROM pension_config LIMIT 1');
     if (!config) {
       await run(
-        'INSERT INTO pension_config (pension_name, total_boxes) VALUES (?, ?)',
-        ['PattesDouces', 10]
+        'INSERT INTO pension_config (pension_name, total_boxes, default_daily_rate) VALUES (?, ?, ?)',
+        ['La Ferme d Acq', 10, 30]
       );
       config = await get('SELECT * FROM pension_config LIMIT 1');
     }
@@ -22,10 +22,10 @@ router.get('/config', async (req, res) => {
 // Mettre à jour la configuration
 router.put('/config', async (req, res) => {
   try {
-    const { pension_name, total_boxes, phone, address, tax_rate } = req.body;
+    const { pension_name, total_boxes, phone, address, tax_rate, default_daily_rate } = req.body;
     await run(
-      'UPDATE pension_config SET pension_name = ?, total_boxes = ?, phone = ?, address = ?, tax_rate = ? WHERE id = 1',
-      [pension_name, total_boxes, phone, address, tax_rate]
+      'UPDATE pension_config SET pension_name = ?, total_boxes = ?, phone = ?, address = ?, tax_rate = ?, default_daily_rate = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1',
+      [pension_name, total_boxes, phone, address, tax_rate, default_daily_rate]
     );
     res.json({ message: 'Configuration mise à jour' });
   } catch (err) {
@@ -133,22 +133,13 @@ router.delete('/services/:id', async (req, res) => {
 router.get('/availability/:startDate/:endDate', async (req, res) => {
   try {
     const { startDate, endDate } = req.params;
-    
-    // Tous les boxes
     const allBoxes = await all('SELECT * FROM boxes WHERE is_active = 1');
-    
-    // Boxes occupés
-    const occupiedBoxes = await all(`
-      SELECT DISTINCT b.id, b.box_number
-      FROM boxes b
-      JOIN animals a ON 1=1
-      JOIN reservations r ON r.animal_id = a.id
-      WHERE r.check_in <= ? AND r.check_out >= ?
-    `, [endDate, startDate]);
-    
-    const occupiedIds = occupiedBoxes.map(b => b.id);
-    const available = allBoxes.filter(b => !occupiedIds.includes(b.id));
-    
+    const occupiedBoxes = await all(
+      'SELECT DISTINCT box_id FROM reservations WHERE status != ? AND check_in < ? AND check_out > ?',
+      ['cancelled', endDate, startDate]
+    );
+    var occupiedIds = occupiedBoxes.map(function(b) { return b.box_id; });
+    var available = allBoxes.filter(function(b) { return occupiedIds.indexOf(b.id) === -1; });
     res.json({
       total: allBoxes.length,
       available: available.length,
