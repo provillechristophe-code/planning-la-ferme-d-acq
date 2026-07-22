@@ -43,8 +43,16 @@ router.post('/calculate', async (req, res) => {
     const subtotal = boxAmount + servicesAmount;
     
     // Récupérer le taux de TVA
-    const config = await get('SELECT tax_rate FROM pension_config LIMIT 1');
-    const taxRate = config?.tax_rate || 0.2;
+const config = await get('SELECT tax_rate FROM pension_config LIMIT 1');
+var taxRate = 0.2;
+
+if (config && config.tax_rate !== undefined && config.tax_rate !== null) {
+  taxRate = Number(config.tax_rate);
+}
+
+if (isNaN(taxRate) || taxRate < 0.001) {
+  taxRate = 0;
+}
     const tax = subtotal * taxRate;
     
     const total = subtotal + tax;
@@ -93,12 +101,22 @@ router.post('/', async (req, res) => {
       [reservation_id]
     );
     
-    const servicesAmount = services[0]?.total || 0;
+  const servicesAmount = (services[0] && services[0].total) ? services[0].total : 0;
+
+
     const subtotal = boxAmount + servicesAmount;
     
     // TVA
-    const config = await get('SELECT tax_rate FROM pension_config LIMIT 1');
-    const taxRate = config?.tax_rate || 0.2;
+const config = await get('SELECT tax_rate FROM pension_config LIMIT 1');
+var taxRate = 0.2;
+
+if (config && config.tax_rate !== undefined && config.tax_rate !== null) {
+  taxRate = Number(config.tax_rate);
+}
+
+if (isNaN(taxRate) || taxRate < 0.001) {
+  taxRate = 0;
+}
     const tax = subtotal * taxRate;
     const total = subtotal + tax;
     

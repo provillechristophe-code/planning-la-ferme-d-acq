@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import InvoicePrint from '../components/InvoicePrint';
+
 var s = {
   page: { maxWidth: 1200, margin: '0 auto' },
   headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 28, flexWrap: 'wrap', gap: 16 },
@@ -46,47 +47,46 @@ var s = {
   invAmount: { fontSize: 18, fontWeight: 800, color: '#10b981' },
   invDate: { fontSize: 12, color: '#94a3b8' },
   statusBadge: { padding: '4px 12px', borderRadius: 50, fontSize: 11, fontWeight: 700, display: 'inline-block' },
-  btnPrint: { background: '#eef2ff', color: '#6366f1', border: '1px solid #c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', marginRight: 6 },
+  btnPrint: { background: '#eef2ff', color: '#6366f1', border: '1px solid #c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  btnPaid: { background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   btnDelete: { background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   countBadge: { background: '#eef2ff', color: '#6366f1', padding: '4px 12px', borderRadius: 50, fontSize: 12, fontWeight: 700 },
   emptyState: { padding: 50, textAlign: 'center', color: '#94a3b8' },
   loading: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 80, color: '#94a3b8' },
   spinner: { width: 40, height: 40, border: '4px solid #e2e8f0', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: 16 }
-};
-function Invoices() {
+};function Invoices() {
   var [invoices, setInvoices] = useState([]);
   var [reservations, setReservations] = useState([]);
   var [clients, setClients] = useState([]);
-  var [, setServices] = useState([]);
   var [form, setForm] = useState({ reservation_id: '', client_id: '' });
   var [calculation, setCalculation] = useState(null);
   var [loading, setLoading] = useState(true);
   var [printingInvoiceId, setPrintingInvoiceId] = useState(null);
   var [filter, setFilter] = useState('all');
-  useEffect(function() {
-    fetchData();
-  }, []);
+
+  useEffect(function() { fetchData(); }, []);
+
   var fetchData = function() {
     Promise.all([
       axios.get('/api/invoices'),
       axios.get('/api/reservations'),
-      axios.get('/api/clients'),
-      axios.get('/api/config/services')
+      axios.get('/api/clients')
     ]).then(function(results) {
       setInvoices(results[0].data);
       setReservations(results[1].data);
       setClients(results[2].data);
-      setServices(results[3].data);
       setLoading(false);
     }).catch(function(err) {
       console.error(err);
       setLoading(false);
     });
   };
+
   var getClientName = function(clientId) {
     var client = clients.find(function(c) { return c.id === clientId; });
     return client && client.name ? client.name : 'Client #' + clientId;
   };
+
   var handleCalculate = function(e) {
     e.preventDefault();
     if (!form.reservation_id) {
@@ -100,16 +100,13 @@ function Invoices() {
       alert('Erreur: ' + msg);
     });
   };
-  var handleCreateInvoice = function(e) {
-    if (e && e.preventDefault) e.preventDefault();
+
+  var handleCreateInvoice = function() {
     if (!form.reservation_id || !form.client_id) {
       alert('Veuillez remplir tous les champs');
       return;
     }
-    axios.post('/api/invoices', {
-      reservation_id: form.reservation_id,
-      client_id: form.client_id
-    }).then(function() {
+    axios.post('/api/invoices', { reservation_id: form.reservation_id, client_id: form.client_id }).then(function() {
       setForm({ reservation_id: '', client_id: '' });
       setCalculation(null);
       fetchData();
@@ -119,7 +116,8 @@ function Invoices() {
       alert('Erreur: ' + msg);
     });
   };
-    var handleMarkPaid = function(inv) {
+
+  var handleMarkPaid = function(inv) {
     if (window.confirm('Marquer la facture #' + inv.id + ' comme payée ?')) {
       axios.put('/api/invoices/' + inv.id + '/pay').then(function() {
         fetchData();
@@ -129,6 +127,7 @@ function Invoices() {
       });
     }
   };
+
   var handleDelete = function(inv) {
     if (window.confirm('Supprimer la facture #' + inv.id + ' ?')) {
       axios.delete('/api/invoices/' + inv.id).then(function() {
@@ -139,29 +138,33 @@ function Invoices() {
       });
     }
   };
-  var updateField = function(field, value) {
-    var newForm = {};
-    Object.keys(form).forEach(function(k) { newForm[k] = form[k]; });
-    newForm[field] = value;
-    setForm(newForm);
-  };
+
   var getStatusStyle = function(status) {
     if (status === 'paid') return { background: '#ecfdf5', color: '#059669' };
     return { background: '#fffbeb', color: '#d97706' };
   };
+
   var getStatusLabel = function(status) {
     if (status === 'paid') return '✓ Payée';
     return '⏳ En attente';
   };
+
+  var safeNum = function(val) {
+    var n = parseFloat(val);
+    return isNaN(n) ? 0 : n;
+  };
+
   var paidCount = invoices.filter(function(i) { return i.payment_status === 'paid'; }).length;
   var pendingCount = invoices.filter(function(i) { return i.payment_status !== 'paid'; }).length;
-  var totalAmount = invoices.reduce(function(sum, i) { return sum + (i.total || 0); }, 0);
+  var totalAmount = invoices.reduce(function(sum, i) { return sum + safeNum(i.total); }, 0);
+
   var filteredInvoices = invoices.filter(function(inv) {
     if (filter === 'all') return true;
     if (filter === 'paid') return inv.payment_status === 'paid';
     if (filter === 'pending') return inv.payment_status !== 'paid';
     return true;
   });
+
   if (loading) {
     return (
       <div style={s.loading}>
@@ -171,6 +174,7 @@ function Invoices() {
       </div>
     );
   }
+
   if (printingInvoiceId) {
     return (
       <InvoicePrint
@@ -178,22 +182,24 @@ function Invoices() {
         onClose={function() { setPrintingInvoiceId(null); }}
       />
     );
-  }
-  return (
+  }  return (
     <div style={s.page}>
       <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
+
       <div style={s.headerRow}>
         <div>
           <h2 style={s.headerTitle}>💶 Facturation</h2>
           <p style={s.headerSub}>Gérez vos factures et encaissements</p>
         </div>
       </div>
+
       <div style={s.statsRow}>
         <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#eef2ff' })}>📄</div><div><div style={s.statValue}>{invoices.length}</div><div style={s.statLabel}>Total factures</div></div></div>
         <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#ecfdf5' })}>✓</div><div><div style={Object.assign({}, s.statValue, { color: '#059669' })}>{paidCount}</div><div style={s.statLabel}>Payées</div></div></div>
         <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#fffbeb' })}>⏳</div><div><div style={Object.assign({}, s.statValue, { color: '#d97706' })}>{pendingCount}</div><div style={s.statLabel}>En attente</div></div></div>
         <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#f0fdf4' })}>💰</div><div><div style={Object.assign({}, s.statValue, { color: '#15803d' })}>{totalAmount.toFixed(0)}€</div><div style={s.statLabel}>Montant total</div></div></div>
       </div>
+
       <div style={s.grid}>
         <div>
           <div style={s.card}>
@@ -208,59 +214,40 @@ function Invoices() {
               <form onSubmit={handleCalculate}>
                 <div style={s.formGroup}>
                   <label style={s.label}>Sélectionner une réservation</label>
-                  <select
-                    style={s.select}
-                    value={form.reservation_id}
+                  <select style={s.select} value={form.reservation_id}
                     onChange={function(e) {
                       var reservationId = e.target.value;
-                      var selectedReservation = reservations.find(function(r) {
-                        return String(r.id) === String(reservationId);
-                      });
-                      setForm({
-                        reservation_id: reservationId,
-                        client_id: selectedReservation ? selectedReservation.client_id : ''
-                      });
-                    }}
-                    required
-                  >
+                      var selectedRes = reservations.find(function(r) { return String(r.id) === String(reservationId); });
+                      setForm({ reservation_id: reservationId, client_id: selectedRes ? selectedRes.client_id : '' });
+                    }} required>
                     <option value="">-- Choisir une réservation --</option>
                     {reservations.map(function(r) {
-                      return (
-                        <option key={r.id} value={r.id}>
-                          Réservation #{r.id} - {getClientName(r.client_id)} - {r.check_in} → {r.check_out}
-                        </option>
-                      );
+                      return <option key={r.id} value={r.id}>#{r.id} - {getClientName(r.client_id)} - {r.check_in} → {r.check_out}</option>;
                     })}
                   </select>
                 </div>
                 <button type="submit" style={s.btnCalc}>🧮 Calculer le montant</button>
               </form>
+
               {calculation && (
                 <div style={s.calcResult}>
                   <div style={s.calcHeader}><h4 style={s.calcTitle}>📊 Détail du calcul</h4></div>
                   <div style={s.calcBody}>
-                    <div style={s.calcRow}><span style={s.calcLabel}>Durée du séjour</span><span style={s.calcValue}>{calculation.days} jours</span></div>
-                    <div style={s.calcRow}><span style={s.calcLabel}>Tarif journalier</span><span style={s.calcValue}>{calculation.boxRate}€/jour</span></div>
-                    <div style={s.calcRow}><span style={s.calcLabel}>Montant pension</span><span style={Object.assign({}, s.calcValue, { color: '#3b82f6' })}>{calculation.boxAmount.toFixed(2)}€</span></div>
-                    <div style={s.calcRow}><span style={s.calcLabel}>Services supplémentaires</span><span style={Object.assign({}, s.calcValue, { color: '#8b5cf6' })}>{calculation.servicesAmount.toFixed(2)}€</span></div>
-                    <div style={s.calcRow}><span style={s.calcLabel}>Sous-total HT</span><span style={s.calcValue}>{calculation.subtotal.toFixed(2)}€</span></div>
-                    <div style={s.calcRow}><span style={s.calcLabel}>TVA ({calculation.taxRate}%)</span><span style={Object.assign({}, s.calcValue, { color: '#ef4444' })}>{calculation.tax.toFixed(2)}€</span></div>
-                    <div style={s.calcTotal}><span style={s.calcTotalLabel}>TOTAL TTC</span><span style={s.calcTotalValue}>{calculation.total.toFixed(2)}€</span></div>
+                    <div style={s.calcRow}><span style={s.calcLabel}>Durée</span><span style={s.calcValue}>{calculation.days} jours</span></div>
+                    <div style={s.calcRow}><span style={s.calcLabel}>Tarif/jour</span><span style={s.calcValue}>{calculation.boxRate}€</span></div>
+                    <div style={s.calcRow}><span style={s.calcLabel}>Pension</span><span style={Object.assign({}, s.calcValue, { color: '#3b82f6' })}>{safeNum(calculation.boxAmount).toFixed(2)}€</span></div>
+                    <div style={s.calcRow}><span style={s.calcLabel}>Services</span><span style={Object.assign({}, s.calcValue, { color: '#8b5cf6' })}>{safeNum(calculation.servicesAmount).toFixed(2)}€</span></div>
+                    <div style={s.calcRow}><span style={s.calcLabel}>Sous-total HT</span><span style={s.calcValue}>{safeNum(calculation.subtotal).toFixed(2)}€</span></div>
+                    <div style={s.calcRow}><span style={s.calcLabel}>TVA ({safeNum(calculation.taxRate).toFixed(0)}%)</span><span style={Object.assign({}, s.calcValue, { color: '#ef4444' })}>{safeNum(calculation.tax).toFixed(2)}€</span></div>
+                    <div style={s.calcTotal}><span style={s.calcTotalLabel}>TOTAL TTC</span><span style={s.calcTotalValue}>{safeNum(calculation.total).toFixed(2)}€</span></div>
+
                     <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px dashed #e2e8f0' }}>
                       <div style={s.formGroup}>
-                        <label style={s.label}>Client (pour la facture)</label>
-                        <p style={s.helper}>Le client est rempli automatiquement à partir de la réservation choisie.</p>
-                        <select
-                          style={s.select}
-                          value={form.client_id}
-                          onChange={function(e) { updateField('client_id', e.target.value); }}
-                          required
-                          disabled={!!form.reservation_id}
-                        >
-                          <option value="">-- Sélectionner le client --</option>
-                          {clients.map(function(c) {
-                            return <option key={c.id} value={c.id}>{c.name}</option>;
-                          })}
+                        <label style={s.label}>Client</label>
+                        <p style={s.helper}>Rempli automatiquement depuis la réservation.</p>
+                        <select style={s.select} value={form.client_id} onChange={function(e) { setForm({ reservation_id: form.reservation_id, client_id: e.target.value }); }} required disabled={!!form.reservation_id}>
+                          <option value="">-- Client --</option>
+                          {clients.map(function(c) { return <option key={c.id} value={c.id}>{c.name}</option>; })}
                         </select>
                       </div>
                       <button type="button" style={s.btnCreate} onClick={handleCreateInvoice}>✓ Créer la facture</button>
@@ -271,16 +258,17 @@ function Invoices() {
             </div>
           </div>
         </div>
+
         <div style={s.card}>
           <div style={Object.assign({}, s.cardHeader, { justifyContent: 'space-between' })}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={Object.assign({}, s.cardIcon, { background: '#fef3c7' })}>📄</div>
               <div>
                 <h3 style={s.cardTitle}>Mes factures</h3>
-                <p style={s.cardSub}>Historique des factures</p>
+                <p style={s.cardSub}>Historique</p>
               </div>
             </div>
-            <span style={s.countBadge}>{filteredInvoices.length} résultats</span>
+            <span style={s.countBadge}>{filteredInvoices.length}</span>
           </div>
           <div style={s.cardBody}>
             <div style={s.filterRow}>
@@ -288,8 +276,9 @@ function Invoices() {
               <button style={filter === 'paid' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('paid'); }}>✓ Payées ({paidCount})</button>
               <button style={filter === 'pending' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('pending'); }}>⏳ En attente ({pendingCount})</button>
             </div>
+
             {filteredInvoices.length === 0 ? (
-              <div style={s.emptyState}><p style={{ fontSize: 40, marginBottom: 12, opacity: 0.3 }}>📄</p><p style={{ fontSize: 14, fontWeight: 500 }}>Aucune facture trouvée</p></div>
+              <div style={s.emptyState}><p style={{ fontSize: 40, opacity: 0.3 }}>📄</p><p>Aucune facture</p></div>
             ) : (
               <div>
                 {filteredInvoices.map(function(inv) {
@@ -306,17 +295,17 @@ function Invoices() {
                       </div>
                       <div style={s.invRight}>
                         <div>
-                          <div style={s.invAmount}>{inv.total.toFixed(2)}€</div>
+                          <div style={s.invAmount}>{safeNum(inv.total).toFixed(2)}€</div>
                           <div style={s.invDate}>📅 {inv.invoice_date}</div>
-                          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>HT: {inv.amount.toFixed(2)}€ • TVA: {inv.tax.toFixed(2)}€</div>
+                          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>HT: {safeNum(inv.amount).toFixed(2)}€ • TVA: {safeNum(inv.tax).toFixed(2)}€</div>
                         </div>
-                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-  {inv.payment_status !== 'paid' && (
-    <button style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }} onClick={function() { handleMarkPaid(inv); }}>✓ Payée</button>
-  )}
-  <button style={s.btnPrint} onClick={function() { setPrintingInvoiceId(inv.id); }}>🖨️ Imprimer</button>
-  <button style={s.btnDelete} onClick={function() { handleDelete(inv); }}>🗑️</button>
-</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {inv.payment_status !== 'paid' && (
+                            <button style={s.btnPaid} onClick={function() { handleMarkPaid(inv); }}>✓ Payée</button>
+                          )}
+                          <button style={s.btnPrint} onClick={function() { setPrintingInvoiceId(inv.id); }}>🖨️</button>
+                          <button style={s.btnDelete} onClick={function() { handleDelete(inv); }}>🗑️</button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -329,4 +318,5 @@ function Invoices() {
     </div>
   );
 }
+
 export default Invoices;

@@ -49,16 +49,17 @@ function Reservations() {
   var [reservations, setReservations] = useState([]);
   var [animals, setAnimals] = useState([]);
   var [clients, setClients] = useState([]);
-    var [form, setForm] = useState({ animal_id: '', client_id: '', box_id: '', check_in: '', check_out: '', daily_rate: '', services: '', notes: '' });
+    var [form, setForm] = useState({ animal_id: '', client_id: '', box_id: '', check_in: '', check_out: '', daily_rate: '', services: '', notes: '', status: 'confirmed' });
   var [boxes, setBoxes] = useState([]);
   var [loading, setLoading] = useState(true);
   var [showForm, setShowForm] = useState(false);
   var [filter, setFilter] = useState('all');
+    var [defaultRate, setDefaultRate] = useState(30);
   useEffect(function() {
     fetchData();
   }, []);
   var fetchData = function() {
-  
+   
       setLoading(false);
         Promise.all([
       axios.get('/api/reservations'),
@@ -70,6 +71,11 @@ function Reservations() {
       setAnimals(results[1].data);
       setClients(results[2].data);
           setBoxes(results[3].data);
+                axios.get('/api/config/config').then(function(configRes) {
+        if (configRes.data && configRes.data.default_daily_rate) {
+          setDefaultRate(configRes.data.default_daily_rate);
+        }
+      });
       setLoading(false);
     }).catch(function(err) {
       console.error(err);
@@ -79,7 +85,7 @@ function Reservations() {
   var handleSubmit = function(e) {
     e.preventDefault();
     axios.post('/api/reservations', form).then(function() {
-      setForm({ animal_id: '', client_id: '', check_in: '', check_out: '', daily_rate: '', services: '', notes: '' });
+      setForm({ animal_id: '', client_id: '', box_id: '', check_in: '', check_out: '', daily_rate: '', services: '', notes: '', status: 'confirmed' });
       setShowForm(false);
       fetchData();
       alert('Réservation créée !');
@@ -251,8 +257,8 @@ function Reservations() {
                     <input style={s.input} type="date" value={form.check_in} onChange={function(e) { updateField('check_in', e.target.value); }} required />
                   </div>
                   <div style={s.formGroup}>
-                    <label style={s.label}>📅 Départ</label>
-                    <input style={s.input} type="date" value={form.check_out} onChange={function(e) { updateField('check_out', e.target.value); }} required />
+                   <label style={s.label}>💶 Tarif journalier (€)</label>
+<input style={s.input} type="number" step="0.01" value={form.daily_rate || defaultRate} onChange={function(e) { updateField('daily_rate', e.target.value); }} placeholder={defaultRate + ''} required />
                   </div>
                 </div>
                 {form.check_in && form.check_out && getDuration(form.check_in, form.check_out) > 0 && (
@@ -263,16 +269,15 @@ function Reservations() {
                     )}
                   </div>
                 )}                <div style={s.formGroup}>
-                  <label style={s.label}>📦 Box</label>
-                  <select style={s.select} value={form.box_id || ''} onChange={function(e) { updateField('box_id', e.target.value); }}>
-                    <option value="">-- Choisir un box --</option>
-                    {boxes.map(function(b) {
-                      return <option key={b.id} value={b.id}>{b.box_number} - {b.box_type} ({b.daily_rate}€/jour)</option>;
-                    })}
-                  </select>
-                </div>                <div style={s.formGroup}>
-                  <label style={s.label}>📦 Box</label>
-                  <select style={s.select} value={form.box_id || ''} onChange={function(e) { updateField('box_id', e.target.value); }}>
+ <label style={s.label}>📦 Box</label>
+<select style={s.select} value={form.box_id || ''} onChange={function(e) {
+  var selectedBox = boxes.find(function(b) { return String(b.id) === String(e.target.value); });
+  var newForm = {};
+  Object.keys(form).forEach(function(k) { newForm[k] = form[k]; });
+  newForm.box_id = e.target.value;
+  if (selectedBox) { newForm.daily_rate = selectedBox.daily_rate; }
+  setForm(newForm);
+}}>
                     <option value="">-- Choisir un box --</option>
                     {boxes.map(function(b) {
                       return <option key={b.id} value={b.id}>{b.box_number} - {b.box_type} ({b.daily_rate}€/jour)</option>;
@@ -290,6 +295,21 @@ function Reservations() {
                 <div style={s.formGroup}>
                   <label style={s.label}>📝 Notes</label>
                   <textarea style={s.textarea} value={form.notes} onChange={function(e) { updateField('notes', e.target.value); }} rows="3" placeholder="Informations supplémentaires..." />
+                </div>
+                                <div style={s.formGroup}>
+                  <label style={s.label}>📋 Type de client</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" onClick={function() { updateField('status', 'confirmed'); }}
+                      style={{ flex: 1, padding: '12px 8px', borderRadius: 10, border: (form.status || 'confirmed') === 'confirmed' ? '3px solid #059669' : '1px solid #e2e8f0', background: (form.status || 'confirmed') === 'confirmed' ? '#ecfdf5' : '#fff', cursor: 'pointer', textAlign: 'center' }}>
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#10b981', margin: '0 auto 6px auto' }}></div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981' }}>Habitué</div>
+                    </button>
+                    <button type="button" onClick={function() { updateField('status', 'pending'); }}
+                      style={{ flex: 1, padding: '12px 8px', borderRadius: 10, border: form.status === 'pending' ? '3px solid #ec4899' : '1px solid #e2e8f0', background: form.status === 'pending' ? '#fdf2f8' : '#fff', cursor: 'pointer', textAlign: 'center' }}>
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#ec4899', margin: '0 auto 6px auto' }}></div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#ec4899' }}>Nouveau</div>
+                    </button>
+                  </div>
                 </div>
                 <button type="submit" style={s.btnSubmit}>📋 Créer la réservation</button>
               </form>

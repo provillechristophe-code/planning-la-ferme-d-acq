@@ -154,8 +154,16 @@ function Configuration() {
             <div style={{ marginTop: 16 }}><label style={s.label}>Adresse</label><input style={s.input} value={configForm.address || ''} onChange={function(e) { updateConfig('address', e.target.value); }} /></div>
             <div style={{ ...s.grid2, marginTop: 16 }}>
               <div><label style={s.label}>Nombre total de boxes</label><input style={s.input} type="number" value={configForm.total_boxes || ''} onChange={function(e) { updateConfig('total_boxes', e.target.value); }} /></div>
-              <div><label style={s.label}>TVA (%)</label><input style={s.input} type="number" step="0.01" value={configForm.tax_rate ? (configForm.tax_rate * 100).toFixed(0) : ''} onChange={function(e) { updateConfig('tax_rate', e.target.value / 100); }} /></div>
+              <div><label style={s.label}>TVA (%)</label><input style={s.input} type="number" step="0.01" value={configForm.tax_rate ? (configForm.tax_rate * 100).toFixed(0) : ''}  onChange={function(e) {
+  var val = parseFloat(e.target.value);
+  if (isNaN(val)) val = 0;
+  updateConfig('tax_rate', val / 100);
+}}/></div>
             </div>
+            <div>
+  <label style={s.label}>💶 Tarif journalier par défaut (€)</label>
+  <input style={s.input} type="number" step="0.01" value={configForm.default_daily_rate || ''} onChange={function(e) { updateConfig('default_daily_rate', e.target.value); }} placeholder="30.00" />
+</div>
             <button style={{ ...s.btn, marginTop: 20 }} onClick={handleUpdateConfig}>💾 Enregistrer</button>
           </div>
         </div>

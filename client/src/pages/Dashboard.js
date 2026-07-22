@@ -330,9 +330,6 @@ function Dashboard() {
       <div style={styles.tableCard}>
         <div style={styles.tableHeader}>
           
-**Ajoutez AVANT** cette ligne :
-
-```jsx
       {/* Arrivées et Départs du jour */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
         {/* Arrivées */}
