@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import Toast from '../components/Toast';
 import InvoicePrint from '../components/InvoicePrint';
 
 var s = {
@@ -51,10 +52,10 @@ var s = {
   btnPaid: { background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   btnDelete: { background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   countBadge: { background: '#eef2ff', color: '#6366f1', padding: '4px 12px', borderRadius: 50, fontSize: 12, fontWeight: 700 },
-  emptyState: { padding: 50, textAlign: 'center', color: '#94a3b8' },
-  loading: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 80, color: '#94a3b8' },
-  spinner: { width: 40, height: 40, border: '4px solid #e2e8f0', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: 16 }
-};function Invoices() {
+  emptyState: { padding: 50, textAlign: 'center', color: '#94a3b8' }
+};
+
+function Invoices() {
   var [invoices, setInvoices] = useState([]);
   var [reservations, setReservations] = useState([]);
   var [clients, setClients] = useState([]);
@@ -63,128 +64,60 @@ var s = {
   var [loading, setLoading] = useState(true);
   var [printingInvoiceId, setPrintingInvoiceId] = useState(null);
   var [filter, setFilter] = useState('all');
+  var [toast, setToast] = useState(null);
+  var showToast = function(message, type) { setToast({ message: message, type: type || 'success' }); };
 
   useEffect(function() { fetchData(); }, []);
 
   var fetchData = function() {
-    Promise.all([
-      axios.get('/api/invoices'),
-      axios.get('/api/reservations'),
-      axios.get('/api/clients')
-    ]).then(function(results) {
-      setInvoices(results[0].data);
-      setReservations(results[1].data);
-      setClients(results[2].data);
-      setLoading(false);
-    }).catch(function(err) {
-      console.error(err);
-      setLoading(false);
-    });
+    Promise.all([axios.get('/api/invoices'), axios.get('/api/reservations'), axios.get('/api/clients')]).then(function(results) {
+      setInvoices(results[0].data); setReservations(results[1].data); setClients(results[2].data); setLoading(false);
+    }).catch(function(err) { console.error(err); setLoading(false); });
   };
 
-  var getClientName = function(clientId) {
-    var client = clients.find(function(c) { return c.id === clientId; });
-    return client && client.name ? client.name : 'Client #' + clientId;
-  };
+  var getClientName = function(clientId) { var c = clients.find(function(x) { return x.id === clientId; }); return c && c.name ? c.name : 'Client #' + clientId; };
 
   var handleCalculate = function(e) {
     e.preventDefault();
-    if (!form.reservation_id) {
-      alert('Veuillez sélectionner une réservation');
-      return;
-    }
-    axios.post('/api/invoices/calculate', { reservation_id: form.reservation_id }).then(function(res) {
-      setCalculation(res.data);
-    }).catch(function(err) {
+    if (!form.reservation_id) { showToast('Sélectionnez une réservation', 'error'); return; }
+    axios.post('/api/invoices/calculate', { reservation_id: form.reservation_id }).then(function(res) { setCalculation(res.data); }).catch(function(err) {
       var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur';
-      alert('Erreur: ' + msg);
+      showToast('Erreur: ' + msg, 'error');
     });
   };
 
   var handleCreateInvoice = function() {
-    if (!form.reservation_id || !form.client_id) {
-      alert('Veuillez remplir tous les champs');
-      return;
-    }
+    if (!form.reservation_id || !form.client_id) { showToast('Remplissez tous les champs', 'error'); return; }
     axios.post('/api/invoices', { reservation_id: form.reservation_id, client_id: form.client_id }).then(function() {
-      setForm({ reservation_id: '', client_id: '' });
-      setCalculation(null);
-      fetchData();
-      alert('Facture créée !');
-    }).catch(function(err) {
-      var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur';
-      alert('Erreur: ' + msg);
-    });
+      setForm({ reservation_id: '', client_id: '' }); setCalculation(null); fetchData(); showToast('Facture créée !');
+    }).catch(function(err) { var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur'; showToast('Erreur: ' + msg, 'error'); });
   };
 
   var handleMarkPaid = function(inv) {
-    if (window.confirm('Marquer la facture #' + inv.id + ' comme payée ?')) {
-      axios.put('/api/invoices/' + inv.id + '/pay').then(function() {
-        fetchData();
-      }).catch(function(err) {
-        var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur';
-        alert('Erreur: ' + msg);
-      });
-    }
+    axios.put('/api/invoices/' + inv.id + '/pay').then(function() { fetchData(); showToast('Facture marquée comme payée !'); }).catch(function(err) {
+      var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur'; showToast('Erreur: ' + msg, 'error');
+    });
   };
 
   var handleDelete = function(inv) {
-    if (window.confirm('Supprimer la facture #' + inv.id + ' ?')) {
-      axios.delete('/api/invoices/' + inv.id).then(function() {
-        fetchData();
-      }).catch(function(err) {
-        var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur';
-        alert('Erreur: ' + msg);
-      });
-    }
+    axios.delete('/api/invoices/' + inv.id).then(function() { fetchData(); showToast('Facture supprimée !'); }).catch(function(err) {
+      var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur'; showToast('Erreur: ' + msg, 'error');
+    });
   };
 
-  var getStatusStyle = function(status) {
-    if (status === 'paid') return { background: '#ecfdf5', color: '#059669' };
-    return { background: '#fffbeb', color: '#d97706' };
-  };
-
-  var getStatusLabel = function(status) {
-    if (status === 'paid') return '✓ Payée';
-    return '⏳ En attente';
-  };
-
-  var safeNum = function(val) {
-    var n = parseFloat(val);
-    return isNaN(n) ? 0 : n;
-  };
+  var getStatusStyle = function(status) { if (status === 'paid') return { background: '#ecfdf5', color: '#059669' }; return { background: '#fffbeb', color: '#d97706' }; };
+  var getStatusLabel = function(status) { if (status === 'paid') return '✓ Payée'; return '⏳ En attente'; };
+  var safeNum = function(val) { var n = parseFloat(val); return isNaN(n) ? 0 : n; };
 
   var paidCount = invoices.filter(function(i) { return i.payment_status === 'paid'; }).length;
   var pendingCount = invoices.filter(function(i) { return i.payment_status !== 'paid'; }).length;
   var totalAmount = invoices.reduce(function(sum, i) { return sum + safeNum(i.total); }, 0);
+  var filteredInvoices = invoices.filter(function(inv) { if (filter === 'all') return true; if (filter === 'paid') return inv.payment_status === 'paid'; if (filter === 'pending') return inv.payment_status !== 'paid'; return true; });
 
-  var filteredInvoices = invoices.filter(function(inv) {
-    if (filter === 'all') return true;
-    if (filter === 'paid') return inv.payment_status === 'paid';
-    if (filter === 'pending') return inv.payment_status !== 'paid';
-    return true;
-  });
-
-  if (loading) {
-    return (
-      <div style={s.loading}>
-        <div style={s.spinner}></div>
-        <p>Chargement des factures...</p>
-        <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
-      </div>
-    );
-  }
-
-  if (printingInvoiceId) {
-    return (
-      <InvoicePrint
-        invoiceId={printingInvoiceId}
-        onClose={function() { setPrintingInvoiceId(null); }}
-      />
-    );
-  }  return (
+  if (loading) return <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8' }}>Chargement...</div>;
+  if (printingInvoiceId) return <InvoicePrint invoiceId={printingInvoiceId} onClose={function() { setPrintingInvoiceId(null); }} />;  return (
     <div style={s.page}>
-      <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={function() { setToast(null); }} />}
 
       <div style={s.headerRow}>
         <div>
@@ -194,7 +127,7 @@ var s = {
       </div>
 
       <div style={s.statsRow}>
-        <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#eef2ff' })}>📄</div><div><div style={s.statValue}>{invoices.length}</div><div style={s.statLabel}>Total factures</div></div></div>
+        <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#eef2ff' })}>📄</div><div><div style={s.statValue}>{invoices.length}</div><div style={s.statLabel}>Total</div></div></div>
         <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#ecfdf5' })}>✓</div><div><div style={Object.assign({}, s.statValue, { color: '#059669' })}>{paidCount}</div><div style={s.statLabel}>Payées</div></div></div>
         <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#fffbeb' })}>⏳</div><div><div style={Object.assign({}, s.statValue, { color: '#d97706' })}>{pendingCount}</div><div style={s.statLabel}>En attente</div></div></div>
         <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#f0fdf4' })}>💰</div><div><div style={Object.assign({}, s.statValue, { color: '#15803d' })}>{totalAmount.toFixed(0)}€</div><div style={s.statLabel}>Montant total</div></div></div>
@@ -205,33 +138,23 @@ var s = {
           <div style={s.card}>
             <div style={s.cardHeader}>
               <div style={Object.assign({}, s.cardIcon, { background: '#dbeafe' })}>🧮</div>
-              <div>
-                <h3 style={s.cardTitle}>Calculer une facture</h3>
-                <p style={s.cardSub}>Depuis une réservation</p>
-              </div>
+              <div><h3 style={s.cardTitle}>Calculer une facture</h3><p style={s.cardSub}>Depuis une réservation</p></div>
             </div>
             <div style={s.cardBody}>
               <form onSubmit={handleCalculate}>
                 <div style={s.formGroup}>
-                  <label style={s.label}>Sélectionner une réservation</label>
-                  <select style={s.select} value={form.reservation_id}
-                    onChange={function(e) {
-                      var reservationId = e.target.value;
-                      var selectedRes = reservations.find(function(r) { return String(r.id) === String(reservationId); });
-                      setForm({ reservation_id: reservationId, client_id: selectedRes ? selectedRes.client_id : '' });
-                    }} required>
-                    <option value="">-- Choisir une réservation --</option>
-                    {reservations.map(function(r) {
-                      return <option key={r.id} value={r.id}>#{r.id} - {getClientName(r.client_id)} - {r.check_in} → {r.check_out}</option>;
-                    })}
+                  <label style={s.label}>Réservation</label>
+                  <select style={s.select} value={form.reservation_id} onChange={function(e) { var rid = e.target.value; var r = reservations.find(function(x) { return String(x.id) === String(rid); }); setForm({ reservation_id: rid, client_id: r ? r.client_id : '' }); }} required>
+                    <option value="">-- Choisir --</option>
+                    {reservations.map(function(r) { return <option key={r.id} value={r.id}>#{r.id} - {getClientName(r.client_id)} - {r.check_in} → {r.check_out}</option>; })}
                   </select>
                 </div>
-                <button type="submit" style={s.btnCalc}>🧮 Calculer le montant</button>
+                <button type="submit" style={s.btnCalc}>🧮 Calculer</button>
               </form>
 
               {calculation && (
                 <div style={s.calcResult}>
-                  <div style={s.calcHeader}><h4 style={s.calcTitle}>📊 Détail du calcul</h4></div>
+                  <div style={s.calcHeader}><h4 style={s.calcTitle}>📊 Détail</h4></div>
                   <div style={s.calcBody}>
                     <div style={s.calcRow}><span style={s.calcLabel}>Durée</span><span style={s.calcValue}>{calculation.days} jours</span></div>
                     <div style={s.calcRow}><span style={s.calcLabel}>Tarif/jour</span><span style={s.calcValue}>{calculation.boxRate}€</span></div>
@@ -240,11 +163,10 @@ var s = {
                     <div style={s.calcRow}><span style={s.calcLabel}>Sous-total HT</span><span style={s.calcValue}>{safeNum(calculation.subtotal).toFixed(2)}€</span></div>
                     <div style={s.calcRow}><span style={s.calcLabel}>TVA ({safeNum(calculation.taxRate).toFixed(0)}%)</span><span style={Object.assign({}, s.calcValue, { color: '#ef4444' })}>{safeNum(calculation.tax).toFixed(2)}€</span></div>
                     <div style={s.calcTotal}><span style={s.calcTotalLabel}>TOTAL TTC</span><span style={s.calcTotalValue}>{safeNum(calculation.total).toFixed(2)}€</span></div>
-
                     <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px dashed #e2e8f0' }}>
                       <div style={s.formGroup}>
                         <label style={s.label}>Client</label>
-                        <p style={s.helper}>Rempli automatiquement depuis la réservation.</p>
+                        <p style={s.helper}>Rempli automatiquement.</p>
                         <select style={s.select} value={form.client_id} onChange={function(e) { setForm({ reservation_id: form.reservation_id, client_id: e.target.value }); }} required disabled={!!form.reservation_id}>
                           <option value="">-- Client --</option>
                           {clients.map(function(c) { return <option key={c.id} value={c.id}>{c.name}</option>; })}
@@ -263,10 +185,7 @@ var s = {
           <div style={Object.assign({}, s.cardHeader, { justifyContent: 'space-between' })}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={Object.assign({}, s.cardIcon, { background: '#fef3c7' })}>📄</div>
-              <div>
-                <h3 style={s.cardTitle}>Mes factures</h3>
-                <p style={s.cardSub}>Historique</p>
-              </div>
+              <div><h3 style={s.cardTitle}>Mes factures</h3></div>
             </div>
             <span style={s.countBadge}>{filteredInvoices.length}</span>
           </div>
@@ -276,7 +195,6 @@ var s = {
               <button style={filter === 'paid' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('paid'); }}>✓ Payées ({paidCount})</button>
               <button style={filter === 'pending' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('pending'); }}>⏳ En attente ({pendingCount})</button>
             </div>
-
             {filteredInvoices.length === 0 ? (
               <div style={s.emptyState}><p style={{ fontSize: 40, opacity: 0.3 }}>📄</p><p>Aucune facture</p></div>
             ) : (
@@ -300,9 +218,7 @@ var s = {
                           <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>HT: {safeNum(inv.amount).toFixed(2)}€ • TVA: {safeNum(inv.tax).toFixed(2)}€</div>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {inv.payment_status !== 'paid' && (
-                            <button style={s.btnPaid} onClick={function() { handleMarkPaid(inv); }}>✓ Payée</button>
-                          )}
+                          {inv.payment_status !== 'paid' && <button style={s.btnPaid} onClick={function() { handleMarkPaid(inv); }}>✓ Payée</button>}
                           <button style={s.btnPrint} onClick={function() { setPrintingInvoiceId(inv.id); }}>🖨️</button>
                           <button style={s.btnDelete} onClick={function() { handleDelete(inv); }}>🗑️</button>
                         </div>

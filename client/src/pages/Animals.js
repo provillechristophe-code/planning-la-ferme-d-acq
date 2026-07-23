@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import Toast from '../components/Toast';
+
 var s = {
   page: { maxWidth: 1200, margin: '0 auto' },
   headerTitle: { fontSize: 28, fontWeight: 800, color: '#1e293b', marginBottom: 4 },
@@ -28,11 +30,10 @@ var s = {
   btnEdit: { background: '#eef2ff', color: '#6366f1', border: 'none', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', marginRight: 6 },
   btnDelete: { background: '#fef2f2', color: '#ef4444', border: 'none', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   emptyState: { padding: 60, textAlign: 'center', color: '#94a3b8' },
-  loading: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 80, color: '#94a3b8' },
-  spinner: { width: 40, height: 40, border: '4px solid #e2e8f0', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: 16 },
   countBadge: { background: '#eef2ff', color: '#6366f1', padding: '4px 12px', borderRadius: 50, fontSize: 12, fontWeight: 700 },
   medicalTag: { background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700 }
 };
+
 var racesChien = [
   'Berger Allemand', 'Berger Australien', 'Berger Belge Malinois', 'Berger Blanc Suisse',
   'Beagle', 'Beauceron', 'Bichon Frisé', 'Bichon Maltais',
@@ -69,6 +70,7 @@ var racesChat = [
   'Tonkinois', 'Turc de Van',
   'Gouttière', 'Croisé', 'Autre'
 ];
+
 function Animals() {
   var [animals, setAnimals] = useState([]);
   var [clients, setClients] = useState([]);
@@ -76,9 +78,11 @@ function Animals() {
   var [editingId, setEditingId] = useState(null);
   var [loading, setLoading] = useState(true);
   var [showForm, setShowForm] = useState(false);
-  useEffect(function() {
-    fetchData();
-  }, []);
+  var [toast, setToast] = useState(null);
+  var showToast = function(message, type) { setToast({ message: message, type: type || 'success' }); };
+
+  useEffect(function() { fetchData(); }, []);
+
   var fetchData = function() {
     Promise.all([
       axios.get('/api/animals'),
@@ -87,106 +91,91 @@ function Animals() {
       setAnimals(results[0].data);
       setClients(results[1].data);
       setLoading(false);
-    }).catch(function(err) {
-      console.error(err);
-      setLoading(false);
-    });
+    }).catch(function(err) { console.error(err); setLoading(false); });
   };
+
   var handleSubmit = function(e) {
     e.preventDefault();
     var request;
-    if (editingId) {
-      request = axios.put('/api/animals/' + editingId, form);
-    } else {
-      request = axios.post('/api/animals', form);
-    }
+    if (editingId) { request = axios.put('/api/animals/' + editingId, form); }
+    else { request = axios.post('/api/animals', form); }
     request.then(function() {
-      alert(editingId ? 'Animal modifié !' : 'Animal ajouté !');
+      showToast(editingId ? 'Animal modifié !' : 'Animal ajouté !');
       resetForm();
       fetchData();
     }).catch(function(err) {
-      var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur inconnue';
-      alert('Erreur: ' + msg);
+      var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur';
+      showToast('Erreur: ' + msg, 'error');
     });
   };
+
   var handleEdit = function(animal) {
     setForm(animal);
     setEditingId(animal.id);
     setShowForm(true);
     window.scrollTo(0, 0);
   };
+
   var resetForm = function() {
     setForm({ client_id: '', name: '', species: '', breed: '', age: '', weight: '', medical_notes: '' });
     setEditingId(null);
     setShowForm(false);
   };
+
   var handleDelete = function(id) {
-    if (window.confirm('Confirmer la suppression de cet animal ?')) {
-      axios.delete('/api/animals/' + id).then(function() {
-        fetchData();
-      }).catch(function(err) {
-        var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur inconnue';
-        alert('Erreur: ' + msg);
-      });
-    }
+    axios.delete('/api/animals/' + id).then(function() {
+      fetchData();
+      showToast('Animal supprimé !');
+    }).catch(function(err) {
+      var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur';
+      showToast('Erreur: ' + msg, 'error');
+    });
   };
+
   var updateField = function(field, value) {
     var newForm = {};
-    Object.keys(form).forEach(function(key) {
-      newForm[key] = form[key];
-    });
+    Object.keys(form).forEach(function(key) { newForm[key] = form[key]; });
     newForm[field] = value;
     setForm(newForm);
   };
+
   var getSpeciesStyle = function(species) {
     var sp = (species || '').toLowerCase();
-    if (sp === 'chien' || sp === 'dog') {
-      return { background: '#eef2ff', color: '#6366f1' };
-    }
-    if (sp === 'chat' || sp === 'cat') {
-      return { background: '#fef3c7', color: '#d97706' };
-    }
+    if (sp === 'chien' || sp === 'dog') return { background: '#eef2ff', color: '#6366f1' };
+    if (sp === 'chat' || sp === 'cat') return { background: '#fef3c7', color: '#d97706' };
     return { background: '#f1f5f9', color: '#64748b' };
   };
+
   var getSpeciesIcon = function(species) {
     var sp = (species || '').toLowerCase();
     if (sp === 'chien' || sp === 'dog') return '🐶';
     if (sp === 'chat' || sp === 'cat') return '🐱';
     return '🐾';
   };
+
   var getClientName = function(clientId) {
     var client = clients.find(function(c) { return c.id === clientId; });
-    if (client && client.name) return client.name;
-    return 'Client #' + clientId;
+    return client && client.name ? client.name : 'Client #' + clientId;
   };
+
   if (loading) {
-    return (
-      <div style={s.loading}>
-        <div style={s.spinner}></div>
-        <p>Chargement des animaux...</p>
-        <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
-      </div>
-    );
-  }
-  return (
+    return <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8' }}>Chargement des animaux...</div>;
+  }  return (
     <div style={s.page}>
-      <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
-      {/* Header */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={function() { setToast(null); }} />}
+
       <div style={s.headerRow}>
         <div>
           <h2 style={s.headerTitle}>🐾 Animaux</h2>
           <p style={s.headerSub}>Gérez les fiches de vos pensionnaires</p>
         </div>
         {!showForm && (
-          <button style={s.btnPrimary} onClick={function() { setShowForm(true); }}>
-            + Ajouter un animal
-          </button>
+          <button style={s.btnPrimary} onClick={function() { setShowForm(true); }}>+ Ajouter un animal</button>
         )}
       </div>
-      {/* Layout */}
+
       {showForm ? (
         <div style={s.grid2}>
-          {/* Formulaire */}
           <div style={s.card}>
             <div style={s.cardHeader}>
               <div>
@@ -200,9 +189,7 @@ function Animals() {
                   <label style={s.label}>Propriétaire</label>
                   <select style={s.select} value={form.client_id} onChange={function(e) { updateField('client_id', e.target.value); }} required>
                     <option value="">-- Sélectionner un client --</option>
-                    {clients.map(function(c) {
-                      return <option key={c.id} value={c.id}>{c.name}</option>;
-                    })}
+                    {clients.map(function(c) { return <option key={c.id} value={c.id}>{c.name}</option>; })}
                   </select>
                 </div>
                 <div style={s.formGroup}>
@@ -220,13 +207,11 @@ function Animals() {
                     </select>
                   </div>
                   <div style={s.formGroup}>
-                 <label style={s.label}>Race</label>
-<input style={s.input} list="race-list" value={form.breed} onChange={function(e) { updateField('breed', e.target.value); }} placeholder="Tapez ou choisissez une race..." />
-<datalist id="race-list">
-  {(form.species === 'Chat' ? racesChat : racesChien).map(function(race) {
-    return <option key={race} value={race} />;
-  })}
-</datalist>
+                    <label style={s.label}>Race</label>
+                    <input style={s.input} list="race-list" value={form.breed} onChange={function(e) { updateField('breed', e.target.value); }} placeholder="Tapez ou choisissez..." />
+                    <datalist id="race-list">
+                      {(form.species === 'Chat' ? racesChat : racesChien).map(function(race) { return <option key={race} value={race} />; })}
+                    </datalist>
                   </div>
                 </div>
                 <div style={s.row2}>
@@ -241,26 +226,18 @@ function Animals() {
                 </div>
                 <div style={s.formGroup}>
                   <label style={s.label}>Notes médicales</label>
-                  <textarea style={s.textarea} value={form.medical_notes} onChange={function(e) { updateField('medical_notes', e.target.value); }} rows="3" placeholder="Allergies, traitements en cours..." />
+                  <textarea style={s.textarea} value={form.medical_notes} onChange={function(e) { updateField('medical_notes', e.target.value); }} rows="3" placeholder="Allergies, traitements..." />
                 </div>
                 <div style={s.btnRow}>
-                  <button type="submit" style={s.btnPrimary}>
-                    {editingId ? '✏️ Modifier' : '➕ Ajouter'}
-                  </button>
-                  <button type="button" style={s.btnCancel} onClick={resetForm}>
-                    Annuler
-                  </button>
+                  <button type="submit" style={s.btnPrimary}>{editingId ? '✏️ Modifier' : '➕ Ajouter'}</button>
+                  <button type="button" style={s.btnCancel} onClick={resetForm}>Annuler</button>
                 </div>
               </form>
             </div>
           </div>
-          {/* Liste */}
           <div style={s.card}>
             <div style={s.cardHeader}>
-              <div>
-                <h3 style={s.cardTitle}>Liste des animaux</h3>
-                <p style={s.cardSub}>Tous vos pensionnaires</p>
-              </div>
+              <div><h3 style={s.cardTitle}>Liste des animaux</h3></div>
               <span style={s.countBadge}>{animals.length} animaux</span>
             </div>
             {renderTable()}
@@ -269,10 +246,7 @@ function Animals() {
       ) : (
         <div style={s.card}>
           <div style={s.cardHeader}>
-            <div>
-              <h3 style={s.cardTitle}>Liste des animaux</h3>
-              <p style={s.cardSub}>Tous vos pensionnaires</p>
-            </div>
+            <div><h3 style={s.cardTitle}>Liste des animaux</h3></div>
             <span style={s.countBadge}>{animals.length} animaux</span>
           </div>
           {renderTable()}
@@ -280,15 +254,14 @@ function Animals() {
       )}
     </div>
   );
+
   function renderTable() {
     if (animals.length === 0) {
       return (
         <div style={s.emptyState}>
           <p style={{ fontSize: 40, marginBottom: 12, opacity: 0.3 }}>🐾</p>
-          <p style={{ fontSize: 14, fontWeight: 500 }}>Aucun animal enregistré</p>
-          <button style={Object.assign({}, s.btnPrimary, { width: 'auto', marginTop: 16 })} onClick={function() { setShowForm(true); }}>
-            + Ajouter un animal
-          </button>
+          <p>Aucun animal enregistré</p>
+          <button style={Object.assign({}, s.btnPrimary, { width: 'auto', marginTop: 16 })} onClick={function() { setShowForm(true); }}>+ Ajouter</button>
         </div>
       );
     }
@@ -312,37 +285,21 @@ function Animals() {
               <tr key={a.id}>
                 <td>
                   <div style={s.animalCell}>
-                    <div style={Object.assign({}, s.animalAvatar, { background: speciesColor.background })}>
-                      {getSpeciesIcon(a.species)}
-                    </div>
+                    <div style={Object.assign({}, s.animalAvatar, { background: speciesColor.background })}>{getSpeciesIcon(a.species)}</div>
                     <div>
                       <div style={s.animalName}>{a.name}</div>
                       <div style={s.animalBreed}>{a.breed || '-'}</div>
                     </div>
                   </div>
                 </td>
-                <td>
-                  <span style={Object.assign({}, s.speciesBadge, speciesColor)}>
-                    {a.species}
-                  </span>
-                </td>
+                <td><span style={Object.assign({}, s.speciesBadge, speciesColor)}>{a.species}</span></td>
                 <td style={{ color: '#64748b', fontSize: 13 }}>{getClientName(a.client_id)}</td>
                 <td style={{ color: '#64748b' }}>{a.age ? a.age + ' ans' : '-'}</td>
                 <td style={{ color: '#64748b' }}>{a.weight ? a.weight + ' kg' : '-'}</td>
+                <td>{a.medical_notes ? <span style={s.medicalTag}>📋 Notes</span> : <span style={{ color: '#cbd5e1', fontSize: 12 }}>-</span>}</td>
                 <td>
-                  {a.medical_notes ? (
-                    <span style={s.medicalTag}>📋 Notes</span>
-                  ) : (
-                    <span style={{ color: '#cbd5e1', fontSize: 12 }}>-</span>
-                  )}
-                </td>
-                <td>
-                  <button style={s.btnEdit} onClick={function() { handleEdit(a); }}>
-                    ✏️ Modifier
-                  </button>
-                  <button style={s.btnDelete} onClick={function() { handleDelete(a.id); }}>
-                    🗑️
-                  </button>
+                  <button style={s.btnEdit} onClick={function() { handleEdit(a); }}>✏️</button>
+                  <button style={s.btnDelete} onClick={function() { handleDelete(a.id); }}>🗑️</button>
                 </td>
               </tr>
             );
@@ -352,4 +309,5 @@ function Animals() {
     );
   }
 }
+
 export default Animals;
