@@ -10,12 +10,23 @@ function GanttChart() {
   var [loading, setLoading] = useState(true);
   var [toast, setToast] = useState(null);
   var showToast = function(msg, type) { setToast({ message: msg, type: type || 'success' }); };
+
+  // Helper timezone-safe
+  var formatDate = function(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  };
+
+  var parseDate = function(str) { return new Date(str + 'T12:00:00'); };
+
   var today = new Date();
-  var todayStr = today.toISOString().split('T')[0];
+  var todayStr = formatDate(today);
   var defaultEnd = new Date(today);
   defaultEnd.setDate(defaultEnd.getDate() + 30);
   var [dateFrom, setDateFrom] = useState(todayStr);
-  var [dateTo, setDateTo] = useState(defaultEnd.toISOString().split('T')[0]);
+  var [dateTo, setDateTo] = useState(formatDate(defaultEnd));
   var [popup, setPopup] = useState(null);
   var [editMode, setEditMode] = useState(false);
   var [editForm, setEditForm] = useState({});
@@ -32,39 +43,49 @@ function GanttChart() {
   var monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   var dayLetters = ['D','L','M','M','J','V','S'];
 
+  var currentViewDate = parseDate(dateFrom);
+  var currentMonthLabel = monthNames[currentViewDate.getMonth()] + ' ' + currentViewDate.getFullYear();
+
   var goToToday = function() {
     var e = new Date(); e.setDate(e.getDate() + 30);
-    setDateFrom(todayStr); setDateTo(e.toISOString().split('T')[0]);
+    setDateFrom(todayStr); setDateTo(formatDate(e));
   };
 
   var goThisWeek = function() {
     var e = new Date(); e.setDate(e.getDate() + 7);
-    setDateFrom(todayStr); setDateTo(e.toISOString().split('T')[0]);
+    setDateFrom(todayStr); setDateTo(formatDate(e));
   };
 
   var goThisMonth = function() {
     var s = new Date(today.getFullYear(), today.getMonth(), 1);
     var e = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    setDateFrom(s.toISOString().split('T')[0]); setDateTo(e.toISOString().split('T')[0]);
+    setDateFrom(formatDate(s)); setDateTo(formatDate(e));
+  };
+
+  var goPrevMonth = function() {
+    var current = parseDate(dateFrom);
+    var s = new Date(current.getFullYear(), current.getMonth() - 1, 1);
+    var e = new Date(current.getFullYear(), current.getMonth(), 0);
+    setDateFrom(formatDate(s)); setDateTo(formatDate(e));
   };
 
   var goNextMonth = function() {
-    var current = new Date(dateTo);
+    var current = parseDate(dateFrom);
     var s = new Date(current.getFullYear(), current.getMonth() + 1, 1);
     var e = new Date(current.getFullYear(), current.getMonth() + 2, 0);
-    setDateFrom(s.toISOString().split('T')[0]); setDateTo(e.toISOString().split('T')[0]);
+    setDateFrom(formatDate(s)); setDateTo(formatDate(e));
   };
 
   var generateDateRange = function() {
-    var dates = []; var s = new Date(dateFrom); var e = new Date(dateTo); var c = new Date(s);
-    while (c <= e) { dates.push(c.toISOString().split('T')[0]); c.setDate(c.getDate() + 1); }
+    var dates = []; var s = parseDate(dateFrom); var e = parseDate(dateTo); var c = new Date(s);
+    while (c <= e) { dates.push(formatDate(c)); c.setDate(c.getDate() + 1); }
     return dates;
   };
 
   var getMonthHeaders = function(dates) {
     var headers = []; var cm = -1; var cy = -1; var count = 0;
     for (var i = 0; i < dates.length; i++) {
-      var d = new Date(dates[i]); var m = d.getMonth(); var y = d.getFullYear();
+      var d = parseDate(dates[i]); var m = d.getMonth(); var y = d.getFullYear();
       if (m !== cm || y !== cy) { if (count > 0) headers.push({ label: monthNames[cm] + ' ' + cy, span: count }); cm = m; cy = y; count = 1; } else { count++; }
     }
     if (count > 0) headers.push({ label: monthNames[cm] + ' ' + cy, span: count });
@@ -72,7 +93,7 @@ function GanttChart() {
   };
 
   var calculatePosition = function(checkIn, checkOut, dates) {
-    var rs = new Date(checkIn); var re = new Date(checkOut); var f = new Date(dates[0]);
+    var rs = parseDate(checkIn); var re = parseDate(checkOut); var f = parseDate(dates[0]);
     var ds = Math.max(0, Math.floor((rs - f) / 86400000));
     var de = Math.min(dates.length, Math.ceil((re - f) / 86400000));
     return { dayStart: ds, width: Math.max(1, de - ds) };
@@ -84,14 +105,19 @@ function GanttChart() {
   var getBarColor = function(r) { if (r.status === 'confirmed') return '#10b981'; if (r.status === 'pending') return '#ec4899'; return '#94a3b8'; };
   var getBoxStyle = function(t) { if (t === 'petit') return { icon: '🏠', bg: '#dbeafe' }; if (t === 'grand') return { icon: '🏰', bg: '#fef3c7' }; return { icon: '🏡', bg: '#d1fae5' }; };
   var getStatusLabel = function(st) { if (st === 'confirmed') return '🟢 Habituel'; if (st === 'pending') return '🩷 Nouveau'; return '⚪ Annulé'; };
-  var getDurationDays = function(a, b) { var d = Math.ceil((new Date(b) - new Date(a)) / 86400000); return d > 0 ? d : 0; };
+  var getDurationDays = function(a, b) { var d = Math.ceil((parseDate(b) - parseDate(a)) / 86400000); return d > 0 ? d : 0; };
   var getReservationTotal = function(r) { return (getDurationDays(r.check_in, r.check_out) * parseFloat(r.daily_rate || 0)).toFixed(2); };
-  var isWeekend = function(d) { var x = new Date(d).getDay(); return x === 0 || x === 6; };
+  var isWeekend = function(d) { var x = parseDate(d).getDay(); return x === 0 || x === 6; };
+
+  var getWeekendHeaderBg = function(d) { return parseDate(d).getDay() === 0 ? '#fff7ed' : '#fee2e2'; };
+  var getWeekendHeaderColor = function(d) { return parseDate(d).getDay() === 0 ? '#ea580c' : '#dc2626'; };
+  var getWeekendCellBg = function(d) { return parseDate(d).getDay() === 0 ? '#fff7ed' : '#fff5f5'; };
+  var getWeekendBorderColor = function(d) { return parseDate(d).getDay() === 0 ? '#fdba74' : '#fecaca'; };
 
   var openNewReservation = function(box, date) {
-    var endDate = new Date(date);
+    var endDate = parseDate(date);
     endDate.setDate(endDate.getDate() + 3);
-    setNewResForm({ animal_id: '', client_id: '', box_id: box.id, check_in: date, check_out: endDate.toISOString().split('T')[0], daily_rate: box.daily_rate || '', notes: '', status: 'confirmed' });
+    setNewResForm({ animal_id: '', client_id: '', box_id: box.id, check_in: date, check_out: formatDate(endDate), daily_rate: box.daily_rate || '', notes: '', status: 'confirmed' });
     setPopup({ type: 'new', box: box, date: date });
   };
 
@@ -129,6 +155,12 @@ function GanttChart() {
   var monthHeaders = getMonthHeaders(dates);
   var colWidth = 40;
 
+  var arrowBtnStyle = {
+    width: 34, height: 34, borderRadius: 10, border: '1px solid #e2e8f0',
+    background: '#fff', cursor: 'pointer', fontSize: 16, color: '#6366f1',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700
+  };
+
   var ss = {
     overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
     modal: { background: '#fff', borderRadius: 20, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.25)' },
@@ -149,7 +181,9 @@ function GanttChart() {
     detailValue: { fontSize: 14, fontWeight: 700, color: '#1e293b' },
     grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
     statusBadge: { padding: '6px 14px', borderRadius: 50, fontSize: 13, fontWeight: 700, display: 'inline-block' }
-  };  return (
+  };
+
+  return (
     <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 24 }}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={function() { setToast(null); }} />}
 
@@ -161,10 +195,14 @@ function GanttChart() {
           <input type="date" value={dateTo} onChange={function(e) { setDateTo(e.target.value); }} style={{ padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 13 }} />
         </div>
         <div style={{ borderLeft: '1px solid #e2e8f0', height: 30, margin: '0 4px' }}></div>
-        <button onClick={goToToday} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid #6366f1', background: '#eef2ff', color: '#6366f1', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Aujourd'hui</button>
+        <button onClick={goToToday} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid #6366f1', background: '#eef2ff', color: '#6366f1', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>📍 Aujourd'hui</button>
         <button onClick={goThisWeek} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>7 jours</button>
-        <button onClick={goThisMonth} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Ce mois</button>
-        <button onClick={goNextMonth} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Mois suivant</button>
+        <div style={{ borderLeft: '1px solid #e2e8f0', height: 30, margin: '0 4px' }}></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', borderRadius: 12, padding: '4px 6px', border: '1px solid #e2e8f0' }}>
+          <button onClick={goPrevMonth} style={arrowBtnStyle} title="Mois précédent">◀</button>
+          <button onClick={goThisMonth} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: '#1e293b', minWidth: 140, textAlign: 'center' }} title="Revenir au mois en cours">📅 {currentMonthLabel}</button>
+          <button onClick={goNextMonth} style={arrowBtnStyle} title="Mois suivant">▶</button>
+        </div>
       </div>
 
       <div style={{ background: '#f8fafc', borderRadius: 12, padding: 14, marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center' }}>
@@ -174,11 +212,13 @@ function GanttChart() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ width: 14, height: 14, borderRadius: 4, background: '#94a3b8' }}></div><span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8' }}>Annulé</span></div>
         <div style={{ borderLeft: '1px solid #cbd5e1', height: 20 }}></div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ width: 14, height: 14, borderRadius: 4, background: '#1e40af' }}></div><span style={{ fontSize: 12, fontWeight: 700, color: '#1e40af' }}>Aujourd'hui</span></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ width: 14, height: 14, borderRadius: 4, background: '#fee2e2', border: '1px solid #fca5a5' }}></div><span style={{ fontSize: 12, fontWeight: 600, color: '#dc2626' }}>Samedi</span></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ width: 14, height: 14, borderRadius: 4, background: '#fff7ed', border: '1px solid #fdba74' }}></div><span style={{ fontSize: 12, fontWeight: 600, color: '#ea580c' }}>Dimanche</span></div>
       </div>
 
       <div style={{ display: 'flex', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
         <div style={{ width: 180, flexShrink: 0, background: '#fafbfc', borderRight: '2px solid #e2e8f0', zIndex: 2 }}>
-          <div style={{ height: 56, borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#64748b', fontSize: 12, textTransform: 'uppercase' }}>📦 Box</div>
+          <div style={{ height: 72, borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#64748b', fontSize: 12, textTransform: 'uppercase' }}>📦 Box</div>
           {boxes.map(function(box) {
             var bs = getBoxStyle(box.box_type);
             return (
@@ -195,16 +235,24 @@ function GanttChart() {
 
         <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
           <div style={{ minWidth: totalDays * colWidth }}>
-            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', height: 28 }}>
               {monthHeaders.map(function(mh, i) {
-                return <div key={i} style={{ width: mh.span * colWidth, textAlign: 'center', padding: '6px 0', fontWeight: 700, fontSize: 13, color: '#6366f1', background: '#eef2ff', borderRight: '1px solid #c7d2fe' }}>{mh.label}</div>;
+                return <div key={i} style={{ width: mh.span * colWidth, textAlign: 'center', lineHeight: '28px', fontWeight: 700, fontSize: 13, color: '#6366f1', background: '#eef2ff', borderRight: '1px solid #c7d2fe' }}>{mh.label}</div>;
               })}
             </div>
-            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', height: 44 }}>
               {dates.map(function(date) {
-                var d = new Date(date); var we = d.getDay() === 0 || d.getDay() === 6; var td = date === todayStr;
+                var d = parseDate(date); var we = d.getDay() === 0 || d.getDay() === 6; var td = date === todayStr;
                 return (
-                  <div key={date} style={{ width: colWidth, textAlign: 'center', padding: '4px 0', fontSize: 10, background: td ? '#1e40af' : we ? '#f1f5f9' : '#fff', color: td ? '#fff' : we ? '#94a3b8' : '#475569', borderRight: '1px solid #f1f5f9', fontWeight: td ? 800 : 500 }}>
+                  <div key={date} style={{
+                    width: colWidth, textAlign: 'center', height: 44,
+                    display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                    fontSize: 10,
+                    background: td ? '#1e40af' : we ? getWeekendHeaderBg(date) : '#fff',
+                    color: td ? '#fff' : we ? getWeekendHeaderColor(date) : '#475569',
+                    borderRight: '1px solid #f1f5f9',
+                    fontWeight: td ? 800 : we ? 700 : 500
+                  }}>
                     <div style={{ fontSize: 9 }}>{dayLetters[d.getDay()]}</div>
                     <div style={{ fontSize: 12, fontWeight: 700 }}>{d.getDate()}</div>
                     {td && <div style={{ fontSize: 7, color: '#bfdbfe' }}>AUJ</div>}
@@ -219,7 +267,13 @@ function GanttChart() {
                   {dates.map(function(date) {
                     var we = isWeekend(date); var td = date === todayStr;
                     var occ = br.some(function(r) { return r.check_in <= date && r.check_out > date && r.status !== 'cancelled'; });
-                    return <div key={date} onClick={function() { if (!occ) openNewReservation(box, date); }} style={{ width: colWidth, borderRight: '1px solid #f8f9fa', background: td ? '#dbeafe' : we ? '#fafafa' : '#fff', borderLeft: td ? '3px solid #1e40af' : 'none', cursor: occ ? 'default' : 'pointer' }} title={occ ? '' : 'Réserver le ' + date}></div>;
+                    return <div key={date} onClick={function() { if (!occ) openNewReservation(box, date); }} style={{
+                      width: colWidth,
+                      borderRight: we ? '1px solid ' + getWeekendBorderColor(date) : '1px solid #f8f9fa',
+                      background: td ? '#dbeafe' : we ? getWeekendCellBg(date) : '#fff',
+                      borderLeft: td ? '3px solid #1e40af' : 'none',
+                      cursor: occ ? 'default' : 'pointer'
+                    }} title={occ ? '' : 'Réserver le ' + date}></div>;
                   })}
                   {br.map(function(res) {
                     var pos = calculatePosition(res.check_in, res.check_out, dates);
@@ -239,7 +293,9 @@ function GanttChart() {
             })}
           </div>
         </div>
-      </div>      {popup && popup.type === 'new' && (
+      </div>
+
+      {popup && popup.type === 'new' && (
         <div style={ss.overlay} onClick={closePopup}>
           <div style={ss.modal} onClick={function(e) { e.stopPropagation(); }}>
             <div style={ss.modalHeader}>

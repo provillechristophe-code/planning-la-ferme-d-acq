@@ -57,6 +57,14 @@ function Reservations() {
   var [toast, setToast] = useState(null);
   var showToast = function(message, type) { setToast({ message: message, type: type || 'success' }); };
 
+  // ✅ Fonction pour afficher la date au format jj/mm/aaaa
+  var displayDate = function(str) {
+    if (!str) return '';
+    var parts = str.split('-');
+    if (parts.length !== 3) return str;
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
+  };
+
   var makeInitialForm = function(rate) {
     return { animal_id: '', client_id: '', box_id: '', check_in: '', check_out: '', daily_rate: rate !== undefined && rate !== null ? String(rate) : '', services: '', notes: '', status: 'confirmed' };
   };
@@ -113,7 +121,9 @@ function Reservations() {
   var totalRevenue = reservations.reduce(function(sum, r) { return sum + (getDuration(r.check_in, r.check_out) * (parseFloat(r.daily_rate) || 0)); }, 0);
   var filteredReservations = reservations.filter(function(r) { if (filter === 'all') return true; return r.status === filter; });
 
-  if (loading) return <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8' }}>Chargement...</div>;  return (
+  if (loading) return <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8' }}>Chargement...</div>;
+
+  return (
     <div style={s.page}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={function() { setToast(null); }} />}
 
@@ -151,7 +161,7 @@ function Reservations() {
                 </div>
                 {form.check_in && form.check_out && getDuration(form.check_in, form.check_out) > 0 && (
                   <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#15803d', fontWeight: 600 }}>
-                    📆 {getDuration(form.check_in, form.check_out)} jours{form.daily_rate ? ' • Total: ' + (getDuration(form.check_in, form.check_out) * parseFloat(form.daily_rate)).toFixed(2) + '€' : ''}
+                    📆 {getDuration(form.check_in, form.check_out)} jours • Du {displayDate(form.check_in)} au {displayDate(form.check_out)}{form.daily_rate ? ' • Total: ' + (getDuration(form.check_in, form.check_out) * parseFloat(form.daily_rate)).toFixed(2) + '€' : ''}
                   </div>
                 )}
                 <div style={s.formGroup}><label style={s.label}>📦 Box</label><select style={s.select} value={form.box_id || ''} onChange={function(e) { var b = boxes.find(function(x) { return String(x.id) === String(e.target.value); }); var f = {}; Object.keys(form).forEach(function(k) { f[k] = form[k]; }); f.box_id = e.target.value; f.daily_rate = b ? String(b.daily_rate) : String(defaultRate); setForm(f); }}><option value="">-- Box --</option>{boxes.map(function(b) { return <option key={b.id} value={b.id}>{b.box_number} - {b.box_type} ({b.daily_rate}€/j)</option>; })}</select></div>
@@ -209,8 +219,8 @@ function Reservations() {
                       </div>
                       <div style={s.resRight}>
                         <div>
-                          <div style={s.resDates}>📅 {r.check_in}</div>
-                          <div style={s.resDates}>📅 {r.check_out}</div>
+                          <div style={s.resDates}>📅 {displayDate(r.check_in)}</div>
+                          <div style={s.resDates}>📅 {displayDate(r.check_out)}</div>
                           <div style={Object.assign({}, s.resPrice, { marginTop: 6 })}>{total}€</div>
                         </div>
                         <button style={s.btnDelete} onClick={function() { handleDelete(r.id); }}>🗑️</button>
