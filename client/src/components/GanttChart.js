@@ -10,6 +10,8 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [activeView, setActiveView] = useState(currentView);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [tooltip, setTooltip] = useState(null);
 
   const showToast = (msg, type = 'success') => {
     setToast({ message: msg, type });
@@ -20,6 +22,19 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
     if (onViewChange) {
       onViewChange(view);
     }
+  };
+
+  // Conflit detection
+  const hasConflict = (box_id, check_in, check_out, excludeId = null) => {
+    if (!box_id || !check_in || !check_out) return null;
+    const conflict = reservations.find((r) => {
+      if (String(r.box_id) !== String(box_id)) return false;
+      if (excludeId && String(r.id) === String(excludeId)) return false;
+      if (r.status === 'cancelled') return false;
+      // overlap: new_start < existing_end && new_end > existing_start
+      return check_in < r.check_out && check_out > r.check_in;
+    });
+    return conflict || null;
   };
 
   const formatDate = (d) => {
@@ -185,6 +200,11 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
 
   const handleCreateReservation = () => {
     if (!newResForm.animal_id || !newResForm.client_id) { showToast('Remplissez tous les champs', 'error'); return; }
+    const conflict = hasConflict(newResForm.box_id, newResForm.check_in, newResForm.check_out);
+    if (conflict) {
+      showToast(`❌ Conflit : Box occupé par ${getAnimalName(conflict.animal_id)} du ${displayDate(conflict.check_in)} au ${displayDate(conflict.check_out)}`, 'error');
+      return;
+    }
     axios.post('/api/reservations', newResForm)
       .then(() => { closePopup(); fetchData(); showToast('Réservation créée !'); })
       .catch((err) => { showToast(`Erreur: ${err.response?.data?.error || 'Erreur'}`, 'error'); });
@@ -203,6 +223,11 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
   const updateEditForm = (field, value) => setEditForm((prev) => ({ ...prev, [field]: value }));
 
   const handleSaveEdit = () => {
+    const conflict = hasConflict(editForm.box_id, editForm.check_in, editForm.check_out, popup.reservation.id);
+    if (conflict) {
+      showToast(`❌ Conflit : Box occupé par ${getAnimalName(conflict.animal_id)} du ${displayDate(conflict.check_in)} au ${displayDate(conflict.check_out)}`, 'error');
+      return;
+    }
     axios.put(`/api/reservations/${popup.reservation.id}`, editForm)
       .then(() => { closePopup(); fetchData(); showToast('Réservation modifiée !'); })
       .catch((err) => { showToast(`Erreur: ${err.response?.data?.error || 'Erreur'}`, 'error'); });
@@ -213,13 +238,38 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
       .then(() => { closePopup(); fetchData(); showToast('Réservation supprimée !'); });
   };
 
-  if (loading) return <div style={{ padding: 40 }}>Chargement...</div>;
-  if (boxes.length === 0) return <div style={{ padding: 40, textAlign: 'center' }}>📦 Aucun box configuré</div>;
-
   const dates = generateDateRange();
   const totalDays = dates.length;
   const monthHeaders = getMonthHeaders(dates);
   const colWidth = 40;
+  const todayIndex = dates.indexOf(todayStr);
+
+  // Filtrage par recherche - version robuste
+  const filteredBoxes = boxes.filter((box) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    if (box.box_number.toLowerCase().includes(q)) return true;
+    if (box.box_type && box.box_type.toLowerCase().includes(q)) return true;
+    // recherche directe dans les animaux / clients
+    const matchingAnimalIds = animals.filter((a) => (a.name || '').toLowerCase().includes(q)).map((a) => String(a.id));
+    const matchingClientIds = clients.filter((c) => (c.name || '').toLowerCase().includes(q)).map((c) => String(c.id));
+    // cherche dans les réservations de ce box
+    const hasMatchingRes = reservations.some((r) => {
+      if (String(r.box_id) !== String(box.id)) return false;
+      if (matchingAnimalIds.includes(String(r.animal_id))) return true;
+      if (matchingClientIds.includes(String(r.client_id))) return true;
+      const animalName = getAnimalName(r.animal_id).toLowerCase();
+      const clientName = getClientName(r.client_id).toLowerCase();
+      return animalName.includes(q) || clientName.includes(q);
+    });
+    return hasMatchingRes;
+  });
+
+  const liveConflictNew = hasConflict(newResForm.box_id, newResForm.check_in, newResForm.check_out);
+  const liveConflictEdit = popup?.type === 'details' && editMode ? hasConflict(editForm.box_id, editForm.check_in, editForm.check_out, popup.reservation.id) : null;
+
+  if (loading) return <div style={{ padding: 40 }}>Chargement...</div>;
+  if (boxes.length === 0) return <div style={{ padding: 40, textAlign: 'center' }}>📦 Aucun box configuré</div>;
 
   const arrowBtnStyle = {
     width: 30, height: 30, borderRadius: 8, border: '1px solid #e2e8f0',
@@ -304,6 +354,22 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
           <button onClick={goNextMonth} style={arrowBtnStyle} title="Mois suivant">▶</button>
         </div>
 
+        {/* Recherche */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 10px' }}>
+          <span style={{ fontSize: 12 }}>🔍</span>
+          <input
+            type="text"
+            placeholder="Animal, client, box..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ border: 'none', outline: 'none', fontSize: 12, width: 160, background: 'transparent' }}
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} style={{ background: '#f1f5f9', border: 'none', borderRadius: 6, width: 18, height: 18, cursor: 'pointer', fontSize: 10 }}>✕</button>
+          )}
+        </div>
+        {searchQuery && <span style={{ fontSize: 11, color: '#6366f1', fontWeight: 700 }}>{filteredBoxes.length}/{boxes.length} box</span>}
+
         {/* Séparateur */}
         <div style={{ borderLeft: '1px solid #e2e8f0', height: 24 }}></div>
 
@@ -363,9 +429,16 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
               <tbody>
                 {reservations
                   .filter((r) => {
-                    if (!dateFrom && !dateTo) return true;
                     if (dateFrom && r.check_out < dateFrom) return false;
                     if (dateTo && r.check_in > dateTo) return false;
+                    if (searchQuery.trim()) {
+                      const q = searchQuery.toLowerCase();
+                      const animalName = getAnimalName(r.animal_id).toLowerCase();
+                      const clientName = getClientName(r.client_id).toLowerCase();
+                      const box = boxes.find((b) => b.id === r.box_id);
+                      const boxNum = box?.box_number?.toLowerCase() || '';
+                      if (!animalName.includes(q) && !clientName.includes(q) && !boxNum.includes(q)) return false;
+                    }
                     return true;
                   })
                   .sort((a, b) => a.check_in > b.check_in ? 1 : -1)
@@ -413,24 +486,32 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
       {activeView === 'gantt' && <div style={{ display: 'flex' }}>
         {/* Colonne gauche - Box */}
         <div style={{ width: 160, flexShrink: 0, background: '#fafbfc', borderRight: '2px solid #e2e8f0', zIndex: 2 }}>
-          <div style={{ height: 72, borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📦 Box</div>
-          {boxes.map((box) => {
+          <div style={{ height: 72, borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📦 Box {searchQuery ? `(${filteredBoxes.length})` : ''}</div>
+          {filteredBoxes.map((box) => {
             const bs = getBoxStyle(box.box_type);
+            const countRes = reservations.filter((r) => String(r.box_id) === String(box.id) && r.status !== 'cancelled' && r.check_out >= todayStr && r.check_in <= dateTo).length;
             return (
-              <div key={box.id} style={{ height: 48, display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px', borderBottom: '1px solid #f1f5f9' }}>
+              <div key={box.id} style={{ height: 48, display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px', borderBottom: '1px solid #f1f5f9', background: countRes > 0 ? '#fff' : '#f8fafc' }}>
                 <span style={{ width: 26, height: 26, borderRadius: 7, background: bs.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>{bs.icon}</span>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 11, color: '#1e293b' }}>{box.box_number}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 11, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 4 }}>{box.box_number} {countRes > 0 && <span style={{ background: '#eef2ff', color: '#6366f1', borderRadius: 10, padding: '0 5px', fontSize: 9 }}>{countRes}</span>}</div>
                   <div style={{ fontSize: 9, color: '#94a3b8' }}>{box.box_type} • {box.daily_rate}€</div>
                 </div>
               </div>
             );
           })}
+          {filteredBoxes.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 11 }}>Aucun box trouvé pour "{searchQuery}"</div>}
         </div>
 
         {/* Colonne droite - Calendrier */}
         <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
-          <div style={{ minWidth: totalDays * colWidth }}>
+          <div style={{ minWidth: totalDays * colWidth, position: 'relative' }}>
+            {/* Ligne aujourd'hui verticale */}
+            {todayIndex >= 0 && (
+              <div style={{ position: 'absolute', left: todayIndex * colWidth + colWidth / 2, top: 0, bottom: 0, width: 2, background: 'linear-gradient(180deg, #6366f1, transparent)', zIndex: 15, pointerEvents: 'none' }}>
+                <div style={{ position: 'sticky', top: 0, background: '#6366f1', color: 'white', fontSize: 8, fontWeight: 800, padding: '3px 6px', borderRadius: '0 0 6px 6px', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(99,102,241,0.4)' }}>📍 AUJ</div>
+              </div>
+            )}
             {/* Header Mois */}
             <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', height: 28 }}>
               {monthHeaders.map((mh, i) => (
@@ -461,8 +542,8 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
               })}
             </div>
             {/* Lignes des boxes */}
-            {boxes.map((box) => {
-              const br = reservations.filter((r) => r.box_id === box.id);
+            {filteredBoxes.map((box) => {
+              const br = reservations.filter((r) => String(r.box_id) === String(box.id));
               return (
                 <div key={box.id} style={{ display: 'flex', position: 'relative', height: 48, borderBottom: '1px solid #f1f5f9' }}>
                   {dates.map((date) => {
@@ -480,22 +561,41 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                     );
                   })}
                   {br.map((res) => {
+                    // filtre recherche aussi sur les barres - version robuste
+                    if (searchQuery.trim()) {
+                      const q = searchQuery.toLowerCase().trim();
+                      const animalName = getAnimalName(res.animal_id).toLowerCase();
+                      const clientName = getClientName(res.client_id).toLowerCase();
+                      const matching = animalName.includes(q) || clientName.includes(q);
+                      // fallback avec IDs directs
+                      const matchingAnimalIds = animals.filter((a) => (a.name || '').toLowerCase().includes(q)).map((a) => String(a.id));
+                      const matchingClientIds = clients.filter((c) => (c.name || '').toLowerCase().includes(q)).map((c) => String(c.id));
+                      const isMatch = matching || matchingAnimalIds.includes(String(res.animal_id)) || matchingClientIds.includes(String(res.client_id));
+                      if (!isMatch) return null;
+                    }
                     const pos = calculatePosition(res.check_in, res.check_out, dates);
                     if (pos.dayStart >= totalDays || pos.dayStart + pos.width < 0) return null;
                     const sp = getAnimalSpecies(res.animal_id);
                     const icon = sp === 'chat' || sp === 'Chat' ? '🐱' : '🐶';
                     return (
-                      <div key={res.id} onClick={() => openReservationDetails(res)}
+                      <div key={res.id}
+                        onClick={() => openReservationDetails(res)}
+                        onMouseEnter={(e) => setTooltip({ reservation: res, x: e.clientX, y: e.clientY })}
+                        onMouseMove={(e) => setTooltip((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : null)}
+                        onMouseLeave={() => setTooltip(null)}
                         style={{
                           position: 'absolute', top: 4, bottom: 4,
                           left: pos.dayStart * colWidth, width: pos.width * colWidth - 2,
                           background: getBarColor(res), borderRadius: 6, color: 'white',
                           fontSize: 11, fontWeight: 700, padding: '0 6px',
                           display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden',
-                          cursor: 'pointer', zIndex: 5,
-                          opacity: res.status === 'cancelled' ? 0.5 : 1
-                        }}
-                        title={`${getAnimalName(res.animal_id)} - ${getClientName(res.client_id)}`}>
+                          cursor: 'pointer', zIndex: tooltip?.reservation?.id === res.id ? 20 : 5,
+                          opacity: res.status === 'cancelled' ? 0.5 : 1,
+                          transform: tooltip?.reservation?.id === res.id ? 'scale(1.05)' : 'scale(1)',
+                          boxShadow: tooltip?.reservation?.id === res.id ? '0 4px 12px rgba(0,0,0,0.3)' : 'none',
+                          transition: 'all 0.15s ease',
+                          border: tooltip?.reservation?.id === res.id ? '2px solid white' : 'none'
+                        }}>
                         <span>{icon}</span>
                         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {pos.width > 2 ? `${getAnimalName(res.animal_id)} - ${getClientName(res.client_id)}` : ''}
@@ -550,6 +650,15 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                 <label style={ss.label}>💶 Tarif/jour (€)</label>
                 <input style={ss.input} type="number" step="0.01" value={newResForm.daily_rate} onChange={(e) => updateNewRes('daily_rate', e.target.value)} />
               </div>
+              {liveConflictNew && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: 18 }}>❌</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>Conflit détecté !</div>
+                    <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 2 }}>Box occupé par <b>{getAnimalName(liveConflictNew.animal_id)}</b> ({getClientName(liveConflictNew.client_id)}) du {displayDate(liveConflictNew.check_in)} au {displayDate(liveConflictNew.check_out)}</div>
+                  </div>
+                </div>
+              )}
               <div style={ss.formGroup}>
                 <label style={ss.label}>📝 Notes</label>
                 <input style={ss.input} value={newResForm.notes} onChange={(e) => updateNewRes('notes', e.target.value)} placeholder="Optionnel..." />
@@ -626,6 +735,15 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                       </button>
                     </div>
                   </div>
+                  {liveConflictEdit && (
+                    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 18 }}>❌</span>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>Conflit détecté !</div>
+                        <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 2 }}>Box occupé par <b>{getAnimalName(liveConflictEdit.animal_id)}</b> du {displayDate(liveConflictEdit.check_in)} au {displayDate(liveConflictEdit.check_out)}</div>
+                      </div>
+                    </div>
+                  )}
                   <div style={ss.grid2}>
                     <div style={ss.formGroup}><label style={ss.label}>📅 Arrivée</label><input style={ss.input} type="date" value={editForm.check_in} onChange={(e) => updateEditForm('check_in', e.target.value)} /></div>
                     <div style={ss.formGroup}><label style={ss.label}>📅 Départ</label><input style={ss.input} type="date" value={editForm.check_out} onChange={(e) => updateEditForm('check_out', e.target.value)} /></div>
@@ -644,6 +762,39 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tooltip au survol */}
+      {tooltip && (
+        <div style={{
+          position: 'fixed',
+          left: tooltip.x + 15,
+          top: tooltip.y + 15,
+          background: '#1e293b',
+          color: '#fff',
+          borderRadius: 12,
+          padding: '12px 14px',
+          fontSize: 12,
+          zIndex: 9999,
+          pointerEvents: 'none',
+          boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
+          minWidth: 200,
+          maxWidth: 280,
+          border: '1px solid #334155'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 16 }}>{getAnimalSpecies(tooltip.reservation.animal_id) === 'chat' || getAnimalSpecies(tooltip.reservation.animal_id) === 'Chat' ? '🐱' : '🐶'}</span>
+            <span style={{ fontWeight: 800, fontSize: 13 }}>{getAnimalName(tooltip.reservation.animal_id)}</span>
+            <span style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: tooltip.reservation.status === 'confirmed' ? '#10b981' : tooltip.reservation.status === 'pending' ? '#ec4899' : '#64748b' }}>{getStatusLabel(tooltip.reservation.status)}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: '#cbd5e1' }}>
+            <div>👤 <span style={{ color: '#fff', fontWeight: 600 }}>{getClientName(tooltip.reservation.client_id)}</span></div>
+            <div>📦 Box {boxes.find((b) => String(b.id) === String(tooltip.reservation.box_id))?.box_number || tooltip.reservation.box_id}</div>
+            <div>📅 {displayDate(tooltip.reservation.check_in)} → {displayDate(tooltip.reservation.check_out)} ({getDurationDays(tooltip.reservation.check_in, tooltip.reservation.check_out)}j)</div>
+            <div>💶 {tooltip.reservation.daily_rate}€/j • <span style={{ color: '#4ade80', fontWeight: 800 }}>{getReservationTotal(tooltip.reservation)}€</span></div>
+            {tooltip.reservation.notes && <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #334155', color: '#94a3b8', fontStyle: 'italic' }}>📝 {tooltip.reservation.notes}</div>}
           </div>
         </div>
       )}

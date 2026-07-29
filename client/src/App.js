@@ -127,10 +127,7 @@ function App() {
         <div className="main-wrapper">
           <header className="top-header">
             <div className="header-left">
-              <div className="search-bar">
-                <span className="search-icon">🔍</span>
-                <input type="text" placeholder="Rechercher un client, un animal..." />
-              </div>
+          
             </div>
             <div className="header-right">
               <button className="notif-btn">
