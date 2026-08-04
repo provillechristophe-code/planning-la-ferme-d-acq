@@ -52,16 +52,31 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
     if (parts.length !== 3) return str;
     return `${parts[2]}/${parts[1]}/${parts[0]}`;
   };
-
   const today = new Date();
   const todayStr = formatDate(today);
 
-  // Par défaut à l'ouverture : Du 1er jour du mois courant au dernier jour du mois
+  // Par défaut : charge les dates sauvegardées en mémoire, ou prend le 1er/dernier jour du mois
   const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
-  const [dateFrom, setDateFrom] = useState(formatDate(firstDayOfMonth));
-  const [dateTo, setDateTo] = useState(formatDate(lastDayOfMonth));
+  const [dateFrom, setDateFrom] = useState(() => {
+    return localStorage.getItem('gantt_date_from') || formatDate(firstDayOfMonth);
+  });
+
+  const [dateTo, setDateTo] = useState(() => {
+    return localStorage.getItem('gantt_date_to') || formatDate(lastDayOfMonth);
+  });
+
+  const changeDateFrom = (valeur) => {
+    setDateFrom(valeur);
+    localStorage.setItem('gantt_date_from', valeur);
+  };
+
+  const changeDateTo = (valeur) => {
+    setDateTo(valeur);
+    localStorage.setItem('gantt_date_to', valeur);
+  };
+
   const [popup, setPopup] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -69,7 +84,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
     animal_id: '', client_id: '', box_id: '', check_in: '', check_out: '',
     daily_rate: '', notes: '', status: 'confirmed'
   });
-  const [showLegend, setShowLegend] = useState(false);
+ const [showLegend, setShowLegend] = useState(false);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -376,7 +391,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
         {/* Dates manuelles */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8' }}>Du</span>
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ padding: '4px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, width: 120 }} />
+          <input type="date" value={dateFrom} onChange={(e) => changeDateFrom(e.target.value)} style={{ padding: '4px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, width: 120 }} />
           <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8' }}>au</span>
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ padding: '4px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, width: 120 }} />
         </div>
