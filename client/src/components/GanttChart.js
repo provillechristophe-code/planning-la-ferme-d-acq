@@ -55,11 +55,13 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
 
   const today = new Date();
   const todayStr = formatDate(today);
-  const defaultEnd = new Date(today);
-  defaultEnd.setDate(defaultEnd.getDate() + 30);
 
-  const [dateFrom, setDateFrom] = useState(todayStr);
-  const [dateTo, setDateTo] = useState(formatDate(defaultEnd));
+  // Par défaut à l'ouverture : Du 1er jour du mois courant au dernier jour du mois
+  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+  const [dateFrom, setDateFrom] = useState(formatDate(firstDayOfMonth));
+  const [dateTo, setDateTo] = useState(formatDate(lastDayOfMonth));
   const [popup, setPopup] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -343,9 +345,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
         {/* Séparateur */}
         <div style={{ borderLeft: '1px solid #e2e8f0', height: 24 }}></div>
 
-        {/* Boutons rapides */}
-        <button onClick={goToToday} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #6366f1', background: '#eef2ff', color: '#6366f1', cursor: 'pointer', fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>📍 Aujourd'hui</button>
-        <button onClick={goThisWeek} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>7j</button>
+       
 
         {/* Navigateur mois */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: '#f1f5f9', borderRadius: 8, padding: '2px 4px' }}>
