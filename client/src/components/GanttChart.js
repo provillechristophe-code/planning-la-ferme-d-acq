@@ -77,14 +77,29 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
     localStorage.setItem('gantt_date_to', valeur);
   };
 
+// ✅ CODE PROPRE ET SANS DOUBLONS
   const [popup, setPopup] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({});
+  
   const [newResForm, setNewResForm] = useState({
-    animal_id: '', client_id: '', box_id: '', check_in: '', check_out: '',
-    daily_rate: '', notes: '', status: 'confirmed'
+    animal_id: '',
+    client_id: '',
+    box_id: '',
+    check_in: '',
+    check_out: '',
+    daily_rate: '',
+    notes: '',
+    status: 'confirmed'
   });
- const [showLegend, setShowLegend] = useState(false);
+
+  // États pour les nouveaux clients / animaux
+  const [isNewClient, setIsNewClient] = useState(false);
+  const [isNewAnimal, setIsNewAnimal] = useState(false);
+  const [newClientData, setNewClientData] = useState({ name: '', phone: '', email: '' });
+  const [newAnimalData, setNewAnimalData] = useState({ name: '', breed: '', species: 'Chien' });
+
+  const [showLegend, setShowLegend] = useState(false);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -215,16 +230,58 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
   const closePopup = () => { setPopup(null); setEditMode(false); };
   const updateNewRes = (field, value) => setNewResForm((prev) => ({ ...prev, [field]: value }));
 
+// ✅ CODE CORRIGÉ ET COMPATIBLE AXIOS
   const handleCreateReservation = () => {
-    if (!newResForm.animal_id || !newResForm.client_id) { showToast('Remplissez tous les champs', 'error'); return; }
+    // Vérification : Si la case n'est PAS cochée, le champ ID doit être rempli. Si elle est cochée, le nom est requis.
+    if (!isNewClient && !newResForm.client_id) { 
+      showToast('Veuillez sélectionner un client', 'error'); 
+      return; 
+    }
+    if (isNewClient && !newClientData.name.trim()) { 
+      showToast('Veuillez entrer le nom du nouveau client', 'error'); 
+      return; 
+    }
+
+    if (!isNewAnimal && !newResForm.animal_id) { 
+      showToast('Veuillez sélectionner un animal', 'error'); 
+      return; 
+    }
+    if (isNewAnimal && !newAnimalData.name.trim()) { 
+      showToast("Veuillez entrer le nom du nouvel animal", 'error'); 
+      return; 
+    }
+
+    // Vérification des conflits dans la réservation
     const conflict = hasConflict(newResForm.box_id, newResForm.check_in, newResForm.check_out);
     if (conflict) {
       showToast(`❌ Conflit : Box occupé par ${getAnimalName(conflict.animal_id)} du ${displayDate(conflict.check_in)} au ${displayDate(conflict.check_out)}`, 'error');
       return;
     }
-    axios.post('/api/reservations', newResForm)
-      .then(() => { closePopup(); fetchData(); showToast('Réservation créée !'); })
-      .catch((err) => { showToast(`Erreur: ${err.response?.data?.error || 'Erreur'}`, 'error'); });
+
+    // Préparation des données pour le serveur
+    const payload = {
+      ...newResForm,
+      is_new_client: isNewClient,
+      new_client: isNewClient ? newClientData : null,
+      is_new_animal: isNewAnimal,
+      new_animal: isNewAnimal ? newAnimalData : null,
+    };
+
+    axios.post('/api/reservations', payload)
+      .then(() => { 
+        closePopup(); 
+        fetchData(); 
+        showToast('Réservation créée !'); 
+
+        // Réinitialisation des formulaires
+        setIsNewClient(false);
+        setIsNewAnimal(false);
+        setNewClientData({ name: '', phone: '', email: '' });
+        setNewAnimalData({ name: '', breed: '', species: 'Chien' });
+      })
+      .catch((err) => { 
+        showToast(`Erreur: ${err.response?.data?.error || 'Erreur'}`, 'error'); 
+      });
   };
 
   const startEdit = (res) => {
@@ -625,7 +682,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
         </div>
       </div>}
 
-      {/* ═══ POPUPS ═══ */}
+{/* ═══ POPUPS ═══ */}
       {popup && popup.type === 'new' && (
         <div style={ss.overlay} onClick={closePopup}>
           <div style={ss.modal} onClick={(e) => e.stopPropagation()}>
@@ -637,20 +694,112 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
               <button style={ss.modalClose} onClick={closePopup}>✕</button>
             </div>
             <div style={ss.modalBody}>
+
+              {/* SECTION CLIENT (Sélection ou Création) */}
               <div style={ss.formGroup}>
-                <label style={ss.label}>Client *</label>
-                <select style={ss.select} value={newResForm.client_id} onChange={(e) => updateNewRes('client_id', e.target.value)}>
-                  <option value="">-- Choisir --</option>
-                  {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <label style={ss.label}>Client *</label>
+                  <label style={{ cursor: 'pointer', fontSize: 12, color: '#2563eb', fontWeight: 600 }}>
+                    <input 
+                      type="checkbox" 
+                      checked={isNewClient} 
+                      onChange={(e) => setIsNewClient(e.target.checked)} 
+                      style={{ marginRight: 4 }}
+                    />
+                    ➕ Nouveau client
+                  </label>
+                </div>
+
+                {!isNewClient ? (
+                  <select 
+                    style={ss.select} 
+                    value={newResForm.client_id} 
+                    onChange={(e) => updateNewRes('client_id', e.target.value)}
+                  >
+                    <option value="">-- Choisir --</option>
+                    {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                ) : (
+                  <div style={{ background: '#f8fafc', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input 
+                      style={ss.input} 
+                      type="text" 
+                      placeholder="Nom complet *" 
+                      value={newClientData.name} 
+                      onChange={(e) => setNewClientData({ ...newClientData, name: e.target.value })} 
+                    />
+                    <input 
+                      style={ss.input} 
+                      type="text" 
+                      placeholder="Téléphone" 
+                      value={newClientData.phone} 
+                      onChange={(e) => setNewClientData({ ...newClientData, phone: e.target.value })} 
+                    />
+                    <input 
+                      style={ss.input} 
+                      type="email" 
+                      placeholder="Email" 
+                      value={newClientData.email} 
+                      onChange={(e) => setNewClientData({ ...newClientData, email: e.target.value })} 
+                    />
+                  </div>
+                )}
               </div>
+
+              {/* SECTION ANIMAL (Sélection ou Création) */}
               <div style={ss.formGroup}>
-                <label style={ss.label}>Animal *</label>
-                <select style={ss.select} value={newResForm.animal_id} onChange={(e) => updateNewRes('animal_id', e.target.value)}>
-                  <option value="">-- Choisir --</option>
-                  {animals.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.species})</option>)}
-                </select>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <label style={ss.label}>Animal *</label>
+                  <label style={{ cursor: 'pointer', fontSize: 12, color: '#2563eb', fontWeight: 600 }}>
+                    <input 
+                      type="checkbox" 
+                      checked={isNewAnimal} 
+                      onChange={(e) => setIsNewAnimal(e.target.checked)} 
+                      style={{ marginRight: 4 }}
+                    />
+                    ➕ Nouvel animal
+                  </label>
+                </div>
+
+                {!isNewAnimal ? (
+                  <select 
+                    style={ss.select} 
+                    value={newResForm.animal_id} 
+                    onChange={(e) => updateNewRes('animal_id', e.target.value)}
+                  >
+                    <option value="">-- Choisir --</option>
+                    {animals.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.species})</option>)}
+                  </select>
+                ) : (
+                  <div style={{ background: '#f8fafc', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input 
+                      style={ss.input} 
+                      type="text" 
+                      placeholder="Nom de l'animal *" 
+                      value={newAnimalData.name} 
+                      onChange={(e) => setNewAnimalData({ ...newAnimalData, name: e.target.value })} 
+                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <select 
+                        style={ss.select} 
+                        value={newAnimalData.species} 
+                        onChange={(e) => setNewAnimalData({ ...newAnimalData, species: e.target.value })}
+                      >
+                        <option value="Chien">🐶 Chien</option>
+                        <option value="Chat">🐱 Chat</option>
+                      </select>
+                      <input 
+                        style={ss.input} 
+                        type="text" 
+                        placeholder="Race (ex: Labrador)" 
+                        value={newAnimalData.breed} 
+                        onChange={(e) => setNewAnimalData({ ...newAnimalData, breed: e.target.value })} 
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
+
               <div style={ss.grid2}>
                 <div style={ss.formGroup}>
                   <label style={ss.label}>📅 Arrivée</label>

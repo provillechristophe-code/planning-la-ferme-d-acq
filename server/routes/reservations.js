@@ -33,12 +33,51 @@ router.get('/check-availability', async (req, res) => {
   }
 });
 
-// Ajouter une réservation
+// Ajouter une réservation (avec option de créer client et/ou animal à la volée)
 router.post('/', async (req, res) => {
   try {
-    const { animal_id, client_id, box_id, check_in, check_out, daily_rate, services, notes } = req.body;
+    let { 
+      animal_id, 
+      client_id, 
+      box_id, 
+      check_in, 
+      check_out, 
+      daily_rate, 
+      services, 
+      notes,
+      is_new_client,
+      new_client, // Objet : { name, phone, email }
+      is_new_animal,
+      new_animal // Objet : { name, species, breed }
+    } = req.body;
 
-    // Vérifier dispo du box si choisi
+    // 1. Si nouveau client, création dans la table 'clients'
+    if (is_new_client && new_client) {
+      client_id = await run(
+        'INSERT INTO clients (name, phone, email) VALUES (?, ?, ?)',
+        [new_client.name, new_client.phone || '', new_client.email || '']
+      );
+    }
+
+    // 2. Si nouvel animal, création dans la table 'animals' (lié au client_id)
+    if (is_new_animal && new_animal) {
+      animal_id = await run(
+        'INSERT INTO animals (name, species, breed, client_id) VALUES (?, ?, ?, ?)',
+        [
+          new_animal.name, 
+          new_animal.species || 'Chien', 
+          new_animal.breed || '', 
+          client_id
+        ]
+      );
+    }
+
+    // Vérification de sécurité
+    if (!client_id || !animal_id) {
+      return res.status(400).json({ error: 'Le client et l\'animal sont obligatoires.' });
+    }
+
+    // 3. Vérifier la disponibilité du box
     if (box_id) {
       const conflict = await get(
         `SELECT id FROM reservations 
@@ -53,11 +92,13 @@ router.post('/', async (req, res) => {
       }
     }
 
+    // 4. Créer la réservation finale
     const id = await run(
       'INSERT INTO reservations (animal_id, client_id, box_id, check_in, check_out, daily_rate, services, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [animal_id, client_id, box_id || null, check_in, check_out, daily_rate, services, notes]
     );
-    res.json({ id, message: 'Réservation créée' });
+
+    res.json({ id, message: 'Réservation créée avec succès !' });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
