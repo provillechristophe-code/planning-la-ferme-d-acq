@@ -8,9 +8,18 @@ const db = require('./db');
 const app = express();
 
 // 1. Sécurisation des en-têtes HTTP
+// 1. Sécurisation des en-têtes HTTP (sans blocage CSP en local)
 app.use(helmet({
-  contentSecurityPolicy: false
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false,
+  crossOriginOpenerPolicy: false
 }));
+
+app.use((req, res, next) => {
+  res.removeHeader('Content-Security-Policy');
+  next();
+});
 
 // 2. Configuration CORS restrictive
 const allowedOrigins = process.env.CLIENT_URL 
