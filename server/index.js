@@ -8,7 +8,9 @@ const db = require('./db');
 const app = express();
 
 // 1. Sécurisation des en-têtes HTTP
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false
+}));
 
 // 2. Configuration CORS restrictive
 const allowedOrigins = process.env.CLIENT_URL 
