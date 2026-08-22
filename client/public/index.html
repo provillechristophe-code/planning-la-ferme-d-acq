@@ -6,12 +6,20 @@
     <meta name="theme-color" content="#000000" />
     <meta
       name="description"
-      content="PattesDouces - Plateforme de gestion de pensions animalières"
+      content="La Ferme d'Acq - Application de gestion pour pension animalière"
     />
-    <title>🐾 PattesDouces</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐾</text></svg>" />
+    <title>🐾 La Ferme d'Acq</title>
+    <script>
+      // Bloquer le bandeau et l'invite d'installation PWA de Chrome
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        return false;
+      });
+    </script>
   </head>
   <body>
-    <noscript>Vous devez activer JavaScript pour utiliser PattesDouces.</noscript>
+    <noscript>Vous devez activer JavaScript pour utiliser La Ferme d'Acq.</noscript>
     <div id="root"></div>
   </body>
 </html>
