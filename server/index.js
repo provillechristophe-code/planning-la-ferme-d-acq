@@ -1,30 +1,27 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet'); // 🛡️ Module de sécurité des en-têtes HTTP
+const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const db = require('./db');
 
 const app = express();
 
-// 1. Sécurisation des en-têtes HTTP
-// 1. Sécurisation des en-têtes HTTP (sans blocage CSP en local)
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: false,
-  crossOriginOpenerPolicy: false
-}));
-
+// 1. Permettre le chargement de toutes les ressources locales (Chrome devtools, traductions, etc.)
 app.use((req, res, next) => {
-  res.removeHeader('Content-Security-Policy');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline';"
+  );
   next();
 });
 
-// 2. Configuration CORS restrictive
+// 2. Configuration CORS autorisant localhost:3000 et localhost:5000
 const allowedOrigins = process.env.CLIENT_URL 
-  ? [process.env.CLIENT_URL, 'http://localhost:3000']
-  : ['http://localhost:3000'];
+  ? [process.env.CLIENT_URL, 'http://localhost:3000', 'http://localhost:5000']
+  : ['http://localhost:3000', 'http://localhost:5000'];
 
 app.use(cors({
   origin: allowedOrigins,
@@ -48,6 +45,21 @@ app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/stats', require('./routes/stats'));
 app.use('/api/config', require('./routes/configuration'));
 
+// Serveur de fichiers statiques React (production / mode application)
+app.use(express.static(path.join(__dirname, '../client/build')));
+
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  const buildIndex = path.join(__dirname, '../client/build', 'index.html');
+  if (fs.existsSync(buildIndex)) {
+    res.sendFile(buildIndex);
+  } else {
+    next();
+  }
+});
+
 // 6. Middleware global de gestion des erreurs (évite le crash du serveur)
 app.use((err, req, res, next) => {
   console.error('❌ Erreur serveur non interceptée :', err.stack);
@@ -57,20 +69,39 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 7. Lancement du serveur
+// 7. Lancement du serveur avec bascule automatique de port si EADDRINUSE
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🐾 Serveur La Ferme d'Acq lancé sur http://localhost:${PORT}`);
-});
+let activeServer = null;
 
-// 8. Fermeture propre du serveur (évite le verrouillage de la DB SQLite ou les erreurs EADDRINUSE)
+const startServer = (portToUse) => {
+  activeServer = app.listen(portToUse, '0.0.0.0', () => {
+    console.log(`🐾 Serveur La Ferme d'Acq lancé sur http://localhost:${portToUse}`);
+  });
+
+  activeServer.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`⚠️ Le port ${portToUse} est déjà occupé. Essai automatique sur le port ${portToUse + 1}...`);
+      setTimeout(() => startServer(portToUse + 1), 300);
+    } else {
+      console.error('❌ Erreur serveur :', err);
+    }
+  });
+};
+
+startServer(PORT);
+
+// 8. Fermeture propre du serveur
 const gracefulShutdown = (signal) => {
   console.log(`\n🛑 Signal ${signal} reçu : Fermeture du serveur Express...`);
-  server.close(() => {
-    console.log('✅ Serveur HTTP fermé.');
-    if (db.close) db.close(); // Ferme la connexion SQLite si la méthode existe
+  if (activeServer) {
+    activeServer.close(() => {
+      console.log('✅ Serveur HTTP fermé.');
+      if (db.close) db.close(); // Ferme la connexion SQLite si la méthode existe
+      process.exit(0);
+    });
+  } else {
     process.exit(0);
-  });
+  }
 };
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
