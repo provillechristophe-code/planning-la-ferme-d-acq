@@ -114,8 +114,16 @@ function Invoices() {
   var totalAmount = invoices.reduce(function(sum, i) { return sum + safeNum(i.total); }, 0);
   var filteredInvoices = invoices.filter(function(inv) { if (filter === 'all') return true; if (filter === 'paid') return inv.payment_status === 'paid'; if (filter === 'pending') return inv.payment_status !== 'paid'; return true; });
 
+  // Exclure les réservations annulées ou déjà facturées de la liste des réservations à émettre
+  var invoicedReservationIds = invoices.map(function(inv) { return String(inv.reservation_id); });
+  var unbilledReservations = reservations.filter(function(r) {
+    return r.status !== 'cancelled' && invoicedReservationIds.indexOf(String(r.id)) === -1;
+  });
+
   if (loading) return <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8' }}>Chargement...</div>;
-  if (printingInvoiceId) return <InvoicePrint invoiceId={printingInvoiceId} onClose={function() { setPrintingInvoiceId(null); }} />;  return (
+  if (printingInvoiceId) return <InvoicePrint invoiceId={printingInvoiceId} onClose={function() { setPrintingInvoiceId(null); }} />;
+
+  return (
     <div style={s.page}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={function() { setToast(null); }} />}
 
@@ -143,11 +151,19 @@ function Invoices() {
             <div style={s.cardBody}>
               <form onSubmit={handleCalculate}>
                 <div style={s.formGroup}>
-                  <label style={s.label}>Réservation</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <label style={s.label}>Réservation à émettre</label>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#6366f1', background: '#eef2ff', padding: '2px 8px', borderRadius: 20 }}>
+                      {unbilledReservations.length} à facturer
+                    </span>
+                  </div>
                   <select style={s.select} value={form.reservation_id} onChange={function(e) { var rid = e.target.value; var r = reservations.find(function(x) { return String(x.id) === String(rid); }); setForm({ reservation_id: rid, client_id: r ? r.client_id : '' }); }} required>
-                    <option value="">-- Choisir --</option>
-                    {reservations.map(function(r) { return <option key={r.id} value={r.id}>#{r.id} - {getClientName(r.client_id)} - {r.check_in} → {r.check_out}</option>; })}
+                    <option value="">-- Sélectionner une réservation non facturée --</option>
+                    {unbilledReservations.map(function(r) { return <option key={r.id} value={r.id}>#{r.id} - {getClientName(r.client_id)} ({r.check_in} → {r.check_out})</option>; })}
                   </select>
+                  {unbilledReservations.length === 0 && (
+                    <p style={{ fontSize: 12, color: '#10b981', marginTop: 6, fontWeight: 600 }}>✓ Toutes les réservations ont été facturées ! Aucune facture en attente d'émission.</p>
+                  )}
                 </div>
                 <button type="submit" style={s.btnCalc}>🧮 Calculer</button>
               </form>
