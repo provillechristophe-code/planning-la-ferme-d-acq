@@ -52,12 +52,18 @@ function Reservations() {
   var [boxes, setBoxes] = useState([]);
   var [loading, setLoading] = useState(true);
   var [showForm, setShowForm] = useState(false);
-  var [filter, setFilter] = useState('all');
+  var [filter, setFilter] = useState('current'); // Par défaut : Affiche les séjours "En cours"
   var [defaultRate, setDefaultRate] = useState(30);
   var [toast, setToast] = useState(null);
   var showToast = function(message, type) { setToast({ message: message, type: type || 'success' }); };
 
-  // ✅ Fonction pour afficher la date au format jj/mm/aaaa
+  // Date locale YYYY-MM-DD
+  var d = new Date();
+  var yyyy = d.getFullYear();
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  var todayStr = yyyy + '-' + mm + '-' + dd;
+
   var displayDate = function(str) {
     if (!str) return '';
     var parts = str.split('-');
@@ -116,10 +122,28 @@ function Reservations() {
   var getStatusLabel = function(st) { if (st === 'confirmed') return '🟢 Habitué'; if (st === 'pending') return '🩷 Nouveau'; if (st === 'cancelled') return '⚪ Annulée'; return st || '—'; };
   var getDuration = function(a, b) { var d = Math.ceil((new Date(b) - new Date(a)) / (1000 * 60 * 60 * 24)); return d > 0 ? d : 0; };
 
+  // Compteurs statistiques par catégorie
+  var currentCount = reservations.filter(function(r) { return r.check_in <= todayStr && r.check_out >= todayStr && r.status !== 'cancelled'; }).length;
+  var upcomingCount = reservations.filter(function(r) { return r.check_in > todayStr && r.status !== 'cancelled'; }).length;
+  var pastCount = reservations.filter(function(r) { return r.check_out < todayStr && r.status !== 'cancelled'; }).length;
   var confirmed = reservations.filter(function(r) { return r.status === 'confirmed'; }).length;
   var pending = reservations.filter(function(r) { return r.status === 'pending'; }).length;
   var totalRevenue = reservations.reduce(function(sum, r) { return sum + (getDuration(r.check_in, r.check_out) * (parseFloat(r.daily_rate) || 0)); }, 0);
-  var filteredReservations = reservations.filter(function(r) { if (filter === 'all') return true; return r.status === filter; });
+
+  // FILTRAGE ET TRI PAR ORDRE CHRONOLOGIQUE DE LA DATE D'ARRIVÉE
+  var filteredReservations = reservations
+    .filter(function(r) {
+      if (filter === 'all') return true;
+      if (filter === 'current') return r.check_in <= todayStr && r.check_out >= todayStr && r.status !== 'cancelled';
+      if (filter === 'upcoming') return r.check_in > todayStr && r.status !== 'cancelled';
+      if (filter === 'past') return r.check_out < todayStr && r.status !== 'cancelled';
+      return r.status === filter;
+    })
+    .sort(function(a, b) {
+      if (a.check_in < b.check_in) return -1;
+      if (a.check_in > b.check_in) return 1;
+      return 0;
+    });
 
   if (loading) return <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8' }}>Chargement...</div>;
 
@@ -137,10 +161,11 @@ function Reservations() {
         </button>
       </div>
 
+      {/* STATISTIQUES EN HAUT DE PAGE */}
       <div style={s.statsRow}>
-        <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#eef2ff' })}>📋</div><div><div style={s.statValue}>{reservations.length}</div><div style={s.statLabel}>Total</div></div></div>
-        <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#ecfdf5' })}>🟢</div><div><div style={Object.assign({}, s.statValue, { color: '#059669' })}>{confirmed}</div><div style={s.statLabel}>Habitués</div></div></div>
-        <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#fdf2f8' })}>🩷</div><div><div style={Object.assign({}, s.statValue, { color: '#ec4899' })}>{pending}</div><div style={s.statLabel}>Nouveaux</div></div></div>
+        <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#ecfdf5' })}>🏨</div><div><div style={Object.assign({}, s.statValue, { color: '#059669' })}>{currentCount}</div><div style={s.statLabel}>En cours</div></div></div>
+        <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#e0f2fe' })}>🔮</div><div><div style={Object.assign({}, s.statValue, { color: '#0284c7' })}>{upcomingCount}</div><div style={s.statLabel}>À venir</div></div></div>
+        <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#f1f5f9' })}>📜</div><div><div style={s.statValue}>{pastCount}</div><div style={s.statLabel}>Passées</div></div></div>
         <div style={s.statCard}><div style={Object.assign({}, s.statIcon, { background: '#f0fdf4' })}>💰</div><div><div style={Object.assign({}, s.statValue, { color: '#15803d' })}>{totalRevenue.toFixed(0)}€</div><div style={s.statLabel}>Revenu estimé</div></div></div>
       </div>
 
@@ -190,14 +215,19 @@ function Reservations() {
             <span style={s.countBadge}>{filteredReservations.length}</span>
           </div>
           <div style={s.cardBody}>
+            {/* BOUTONS DE FILTRES SÉPARÉS */}
             <div style={s.filterRow}>
+              <button style={filter === 'current' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('current'); }}>🏨 En cours ({currentCount})</button>
+              <button style={filter === 'upcoming' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('upcoming'); }}>🔮 À venir ({upcomingCount})</button>
+              <button style={filter === 'past' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('past'); }}>📜 Passées ({pastCount})</button>
               <button style={filter === 'all' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('all'); }}>Toutes ({reservations.length})</button>
               <button style={filter === 'confirmed' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('confirmed'); }}>🟢 Habitués ({confirmed})</button>
               <button style={filter === 'pending' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('pending'); }}>🩷 Nouveaux ({pending})</button>
               <button style={filter === 'cancelled' ? s.filterBtnActive : s.filterBtn} onClick={function() { setFilter('cancelled'); }}>⚪ Annulées</button>
             </div>
+
             {filteredReservations.length === 0 ? (
-              <div style={s.emptyState}><p style={{ fontSize: 40, opacity: 0.3 }}>📋</p><p>Aucune réservation</p></div>
+              <div style={s.emptyState}><p style={{ fontSize: 40, opacity: 0.3 }}>📋</p><p>Aucune réservation trouvée pour ce filtre</p></div>
             ) : (
               <div>
                 {filteredReservations.map(function(r) {

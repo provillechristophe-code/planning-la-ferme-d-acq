@@ -2,10 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { run, get, all } = require('../db');
 
-// Lister toutes les réservations
+// Lister toutes les réservations (triées par date d'arrivée par ordre chronologique ASC)
 router.get('/', async (req, res) => {
   try {
-    const reservations = await all('SELECT * FROM reservations ORDER BY check_in DESC');
+    const reservations = await all('SELECT * FROM reservations ORDER BY check_in ASC');
     res.json(reservations);
   } catch (err) {
     res.status(400).json({ error: err.message });
