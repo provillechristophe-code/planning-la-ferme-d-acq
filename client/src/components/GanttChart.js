@@ -354,7 +354,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
     input: { width: '100%', padding: '11px 14px', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 14, color: '#1e293b', outline: 'none', boxSizing: 'border-box' },
     select: { width: '100%', padding: '11px 14px', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 14, color: '#1e293b', outline: 'none', boxSizing: 'border-box', background: '#fff' },
     btnCreate: { width: '100%', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#fff', border: 'none', padding: '13px 24px', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
-    btnDelete: { width: '100%', background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '13px 24px', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer', marginTop: 8 },
+    btnDelete: { width: '100%', background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '13px 24px', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 8 },
     btnCancel: { width: '100%', background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', padding: '13px 24px', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer', marginTop: 8 },
     detailRow: { display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f1f5f9' },
     detailLabel: { fontSize: 13, color: '#94a3b8', fontWeight: 600 },
@@ -446,7 +446,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                   <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📅 Arrivée</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📅 Départ</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>⏱ Durée</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>💰 Total</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>💰 Total</th>
                   <th style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Actions</th>
                 </tr>
               </thead>
@@ -561,6 +561,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                         onTouchEnd={(e) => { 
                           if (!occ) { 
                             e.preventDefault(); 
+                            e.stopPropagation(); 
                             openNewReservation(box, date); 
                           } 
                         }}
@@ -584,13 +585,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                         onTouchEnd={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          if (tooltip && tooltip.reservation.id === res.id) {
-                            setTooltip(null);
-                            openReservationDetails(res);
-                          } else {
-                            const touch = e.changedTouches[0];
-                            setTooltip({ reservation: res, x: touch ? touch.clientX : 100, y: touch ? touch.clientY : 100 });
-                          }
+                          openReservationDetails(res);
                         }}
                         onMouseEnter={(e) => setTooltip({ reservation: res, x: e.clientX, y: e.clientY })}
                         onMouseMove={(e) => setTooltip((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : null)}
