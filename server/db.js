@@ -6,9 +6,14 @@ let sqliteDb = null;
 
 if (isPg) {
   const { Pool } = require('pg');
+  const dbUrl = new URL(process.env.DATABASE_URL);
+  
   pgPool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false }
+    ssl: process.env.DATABASE_URL.includes('localhost') ? false : {
+      rejectUnauthorized: false,
+      servername: dbUrl.hostname
+    }
   });
   console.log('🐘 Connexion à PostgreSQL configurée');
 } else {
