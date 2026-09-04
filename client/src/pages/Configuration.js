@@ -61,6 +61,27 @@ function Configuration() {
     axios.put('/api/config/config', configForm).then(function() { showToast('Configuration sauvegardée !'); fetchData(); }).catch(function() { showToast('Erreur', 'error'); });
   };
 
+  var handleDownloadBackup = function() {
+    showToast('Téléchargement de la sauvegarde en cours...');
+    axios.get('/api/backup-db', { responseType: 'blob' })
+      .then(function(res) {
+        var contentType = res.headers['content-type'] || '';
+        var extension = contentType.includes('json') ? 'json' : 'db';
+        var url = window.URL.createObjectURL(new Blob([res.data]));
+        var link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'pattes_douces_backup_' + new Date().toISOString().slice(0, 10) + '.' + extension);
+        document.body.appendChild(link);
+        link.click();
+        link.parentNode.removeChild(link);
+        showToast('Sauvegarde téléchargée avec succès !');
+      })
+      .catch(function(err) {
+        console.error('Erreur téléchargement sauvegarde :', err);
+        showToast('Erreur lors du téléchargement de la sauvegarde', 'error');
+      });
+  };
+
   var handleAddBox = function() {
     axios.post('/api/config/boxes', boxForm).then(function() {
       setBoxForm({ box_number: '', box_type: 'standard', capacity: 1, daily_rate: 30 });
@@ -99,7 +120,9 @@ function Configuration() {
     axios.delete('/api/config/services/' + service.id).then(function() { fetchData(); showToast('Service supprimé !'); });
   };
 
-  if (loading) return <p style={{ padding: 40 }}>Chargement...</p>;  return (
+  if (loading) return <p style={{ padding: 40 }}>Chargement...</p>;
+
+  return (
     <div style={s.page}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={function() { setToast(null); }} />}
 
@@ -141,19 +164,18 @@ function Configuration() {
               <span>💾</span> Sauvegarde & Sécurité des données
             </h3>
             <p style={{ fontSize: 13, color: '#15803d', marginTop: 6, lineHeight: 1.5 }}>
-              Téléchargez à tout moment une copie physique complète de votre base de données (fichier <code>.db</code>) contenant l'intégralité de vos clients, animaux, réservations et factures.
+              Téléchargez à tout moment une copie physique complète de votre base de données contenant l'intégralité de vos clients, animaux, réservations et factures.
             </p>
             <div style={{ marginTop: 16 }}>
-              <a 
-                href="/api/backup-db" 
-                download 
+              <button 
+                onClick={handleDownloadBackup} 
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '8px',
                   background: 'linear-gradient(135deg, #10b981, #059669)',
                   color: '#ffffff',
-                  textDecoration: 'none',
+                  border: 'none',
                   padding: '12px 20px',
                   borderRadius: '10px',
                   fontSize: '14px',
@@ -163,7 +185,7 @@ function Configuration() {
                 }}
               >
                 📥 Télécharger la sauvegarde de la base (.db)
-              </a>
+              </button>
             </div>
           </div>
         </div>
