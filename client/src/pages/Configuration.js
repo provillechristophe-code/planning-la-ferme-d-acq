@@ -75,12 +75,10 @@ function Configuration() {
     showToast('Téléchargement de la sauvegarde en cours...');
     axios.get('/api/backup-db', { responseType: 'blob' })
       .then(function(res) {
-        var contentType = res.headers['content-type'] || '';
-        var extension = contentType.includes('json') ? 'json' : 'db';
-        var url = window.URL.createObjectURL(new Blob([res.data]));
+        var url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/json' }));
         var link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', 'pattes_douces_backup_' + new Date().toISOString().slice(0, 10) + '.' + extension);
+        link.setAttribute('download', 'pattes_douces_backup_' + new Date().toISOString().slice(0, 10) + '.json');
         document.body.appendChild(link);
         link.click();
         link.parentNode.removeChild(link);
@@ -101,9 +99,16 @@ function Configuration() {
       try {
         var content = evt.target.result;
         var data = JSON.parse(content);
+
+        showToast('Restauration des données en cours...');
         axios.post('/api/reservations/restore-full', data)
-          .then(function() {
-            showToast('Restauration effectuée avec succès !');
+          .then(function(res) {
+            var msg = 'Base restaurée avec succès !';
+            if (res.data && res.data.counts) {
+              var c = res.data.counts;
+              msg += ' (' + (c.clients || 0) + ' clients, ' + (c.animals || 0) + ' animaux, ' + (c.reservations || 0) + ' réservations)';
+            }
+            showToast(msg);
             fetchData();
           })
           .catch(function(err) {
@@ -111,10 +116,11 @@ function Configuration() {
             showToast('Erreur lors de la restauration.', 'error');
           });
       } catch (err) {
-        showToast('Fichier non valide. Seuls les fichiers de sauvegarde de cette application sont pris en charge.', 'error');
+        showToast('Fichier invalide. Veuillez sélectionner un fichier de sauvegarde (.json) téléchargé depuis cette application.', 'error');
       }
     };
     reader.readAsText(file);
+    e.target.value = '';
   };
 
   var handleAddBox = function() {
@@ -235,7 +241,7 @@ function Configuration() {
               <span>💾</span> Sauvegarde & Sécurité des données
             </h3>
             <p style={{ fontSize: 13, color: '#15803d', marginTop: 6, lineHeight: 1.5 }}>
-              Le fichier téléchargé est une sauvegarde de sécurité de votre pension. Vous pouvez le conserver en lieu sûr et le réimporter ici à tout moment pour restaurer l'intégralité de vos clients, animaux, réservations et factures.
+              Téléchargez un fichier de sauvegarde (<code>.json</code>) pour conserver une copie complète de vos clients, animaux, réservations et factures. Vous pouvez le restaurer ici à tout moment d'un simple clic.
             </p>
 
             <div style={{ marginTop: 16, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -283,7 +289,7 @@ function Configuration() {
                 ref={restoreInputRef} 
                 onChange={handleRestoreFileSelect} 
                 style={{ display: 'none' }} 
-                accept=".db,.json" 
+                accept=".json,.db" 
               />
             </div>
           </div>

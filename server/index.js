@@ -29,44 +29,39 @@ app.use(cors({
   credentials: true
 }));
 
-// 3. Middlewares d'analyse du corps des requêtes
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// 3. Middlewares d'analyse du corps des requêtes (limite 50mb pour gros fichiers)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // 4. Initialisation de la base de données
 db.initialize();
 
-// Endpoint de téléchargement de sauvegarde de la base de données (SQLite .db ou Fallback JSON)
+// Endpoint de téléchargement de sauvegarde de la base de données (Export JSON universel 100% lisible et restaurable)
 app.get('/api/backup-db', async (req, res) => {
   try {
-    const dbPath = db.dbPath || path.join(__dirname, 'pattes_douces.db');
-    if (fs.existsSync(dbPath)) {
-      return res.download(dbPath, `pattes_douces_backup_${new Date().toISOString().slice(0,10)}.db`);
-    }
-    
-    // Fallback : Génère un fichier JSON complet si le fichier .db physique n'est pas sur le disque standard
     const clients = await db.all('SELECT * FROM clients');
     const animals = await db.all('SELECT * FROM animals');
     const boxes = await db.all('SELECT * FROM boxes');
     const reservations = await db.all('SELECT * FROM reservations');
     const invoices = await db.all('SELECT * FROM invoices');
-    const config = await db.get('SELECT * FROM pension_config');
+    const config = await db.get('SELECT * FROM pension_config LIMIT 1');
     const services = await db.all('SELECT * FROM services');
 
     const backupData = {
       version: '1.0',
       timestamp: new Date().toISOString(),
-      config,
-      clients,
-      animals,
-      boxes,
-      reservations,
-      invoices,
-      services
+      config: config || {},
+      clients: clients || [],
+      animals: animals || [],
+      boxes: boxes || [],
+      reservations: reservations || [],
+      invoices: invoices || [],
+      services: services || []
     };
 
+    const dateStr = new Date().toISOString().slice(0, 10);
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', `attachment; filename=pattes_douces_backup_${new Date().toISOString().slice(0,10)}.json`);
+    res.setHeader('Content-Disposition', `attachment; filename=pattes_douces_backup_${dateStr}.json`);
     return res.send(JSON.stringify(backupData, null, 2));
   } catch (err) {
     console.error('Erreur génération sauvegarde :', err);
