@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom';
+import axios from 'axios';
 import './App.css';
 
 import Login from './pages/Login';
@@ -16,11 +17,78 @@ import Import from './pages/Import';
 
 function App() {
   var savedToken = localStorage.getItem('token');
-  var savedUser = localStorage.getItem('user');
+  var savedUserStr = localStorage.getItem('user');
+  var parsedUser = null;
+  if (savedUserStr) {
+    try {
+      parsedUser = JSON.parse(savedUserStr);
+    } catch (e) {
+      console.error('Erreur lecture utilisateur:', e);
+    }
+  }
 
   const [token, setToken] = useState(savedToken);
-  const [user, setUser] = useState(savedUser ? JSON.parse(savedUser) : null);
+  const [user, setUser] = useState(parsedUser);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Synchronisation et restauration automatique sécurisée
+  useEffect(() => {
+    if (!token) return;
+
+    let isMounted = true;
+
+    const startSyncProcess = async () => {
+      // 1. Restaurer si une sauvegarde locale existe
+      const savedBackupStr = localStorage.getItem('la_ferme_d_acq_backup');
+      if (savedBackupStr) {
+        try {
+          const backupData = JSON.parse(savedBackupStr);
+          await axios.post('/api/reservations/restore-full', backupData);
+        } catch (e) {
+          console.error('Erreur restauration locale:', e);
+        }
+      }
+
+      // 2. Synchroniser régulièrement les données du serveur vers la sauvegarde locale du navigateur
+      const syncBackup = () => {
+        if (!isMounted) return;
+        Promise.all([
+          axios.get('/api/clients'),
+          axios.get('/api/animals'),
+          axios.get('/api/config/boxes'),
+          axios.get('/api/reservations'),
+          axios.get('/api/invoices')
+        ])
+          .then((results) => {
+            const payload = {
+              clients: results[0].data || [],
+              animals: results[1].data || [],
+              boxes: results[2].data || [],
+              reservations: results[3].data || [],
+              invoices: results[4].data || []
+            };
+            if (payload.reservations.length > 0 || payload.clients.length > 0) {
+              localStorage.setItem('la_ferme_d_acq_backup', JSON.stringify(payload));
+            }
+          })
+          .catch(() => {});
+      };
+
+      syncBackup();
+      const interval = setInterval(syncBackup, 15000);
+      return interval;
+    };
+
+    let syncInterval = null;
+    startSyncProcess().then((interval) => {
+      syncInterval = interval;
+    });
+
+    return () => {
+      isMounted = false;
+      if (syncInterval) clearInterval(syncInterval);
+    };
+  }, [token]);
 
   var handleLogin = function(newToken, newUser) {
     localStorage.setItem('token', newToken);
@@ -34,6 +102,22 @@ function App() {
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
+  };
+
+  var handleHeaderBackupDownload = function() {
+    axios.get('/api/backup-db', { responseType: 'blob' })
+      .then(function(res) {
+        var url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/json' }));
+        var link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'pattes_douces_backup_' + new Date().toISOString().slice(0, 10) + '.json');
+        document.body.appendChild(link);
+        link.click();
+        link.parentNode.removeChild(link);
+      })
+      .catch(function(err) {
+        console.error('Erreur téléchargement sauvegarde :', err);
+      });
   };
 
   var getUserName = function() {
@@ -52,7 +136,7 @@ function App() {
 
   if (!token) {
     return (
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div className="auth-wrapper">
           <Routes>
             <Route path="/login" element={<Login onLogin={handleLogin} />} />
@@ -77,7 +161,7 @@ function App() {
   ];
 
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="app-layout">
         <aside className={sidebarOpen ? 'sidebar open' : 'sidebar closed'}>
           <div className="sidebar-header">
@@ -127,7 +211,26 @@ function App() {
         <div className="main-wrapper">
           <header className="top-header">
             <div className="header-left">
-          
+              <button 
+                onClick={handleHeaderBackupDownload} 
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '8px 14px',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  boxShadow: '0 2px 8px rgba(16,185,129,0.25)',
+                  cursor: 'pointer'
+                }}
+                title="Télécharger une sauvegarde instantanée de vos données"
+              >
+                💾 Sauvegarder la base
+              </button>
             </div>
             <div className="header-right">
               <button className="notif-btn">
