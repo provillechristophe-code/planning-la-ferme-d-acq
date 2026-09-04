@@ -135,6 +135,37 @@ function Configuration() {
               <button style={{ ...s.btnPrimary, marginTop: 20 }} onClick={handleUpdateConfig}>💾 Enregistrer</button>
             </div>
           </div>
+
+          <div style={Object.assign({}, s.card, { marginTop: 24, background: '#f0fdf4', border: '1px solid #bbf7d0' })}>
+            <h3 style={{ marginTop: 0, color: '#166534', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>💾</span> Sauvegarde & Sécurité des données
+            </h3>
+            <p style={{ fontSize: 13, color: '#15803d', marginTop: 6, lineHeight: 1.5 }}>
+              Téléchargez à tout moment une copie physique complète de votre base de données (fichier <code>.db</code>) contenant l'intégralité de vos clients, animaux, réservations et factures.
+            </p>
+            <div style={{ marginTop: 16 }}>
+              <a 
+                href="/api/backup-db" 
+                download 
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  color: '#ffffff',
+                  textDecoration: 'none',
+                  padding: '12px 20px',
+                  borderRadius: '10px',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
+                  cursor: 'pointer'
+                }}
+              >
+                📥 Télécharger la sauvegarde de la base (.db)
+              </a>
+            </div>
+          </div>
         </div>
       )}
 
