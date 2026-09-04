@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Toast from '../components/Toast';
 
@@ -43,6 +43,7 @@ function Configuration() {
   // Base de données complète pour l'onglet visualiseur
   var [dbData, setDbData] = useState({ clients: [], animals: [], boxes: [], reservations: [], invoices: [] });
   var [selectedDbTable, setSelectedDbTable] = useState('clients');
+  var restoreInputRef = useRef(null);
 
   useEffect(function() { fetchData(); }, []);
 
@@ -89,6 +90,31 @@ function Configuration() {
         console.error('Erreur téléchargement sauvegarde :', err);
         showToast('Erreur lors du téléchargement de la sauvegarde', 'error');
       });
+  };
+
+  var handleRestoreFileSelect = function(e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    var reader = new FileReader();
+    reader.onload = function(evt) {
+      try {
+        var content = evt.target.result;
+        var data = JSON.parse(content);
+        axios.post('/api/reservations/restore-full', data)
+          .then(function() {
+            showToast('Restauration effectuée avec succès !');
+            fetchData();
+          })
+          .catch(function(err) {
+            console.error('Erreur restauration :', err);
+            showToast('Erreur lors de la restauration.', 'error');
+          });
+      } catch (err) {
+        showToast('Fichier non valide. Seuls les fichiers de sauvegarde de cette application sont pris en charge.', 'error');
+      }
+    };
+    reader.readAsText(file);
   };
 
   var handleAddBox = function() {
@@ -209,9 +235,10 @@ function Configuration() {
               <span>💾</span> Sauvegarde & Sécurité des données
             </h3>
             <p style={{ fontSize: 13, color: '#15803d', marginTop: 6, lineHeight: 1.5 }}>
-              Téléchargez à tout moment une copie physique complète de votre base de données contenant l'intégralité de vos clients, animaux, réservations et factures.
+              Le fichier téléchargé est une sauvegarde de sécurité de votre pension. Vous pouvez le conserver en lieu sûr et le réimporter ici à tout moment pour restaurer l'intégralité de vos clients, animaux, réservations et factures.
             </p>
-            <div style={{ marginTop: 16 }}>
+
+            <div style={{ marginTop: 16, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <button 
                 onClick={handleDownloadBackup} 
                 style={{
@@ -229,8 +256,35 @@ function Configuration() {
                   cursor: 'pointer'
                 }}
               >
-                📥 Télécharger la sauvegarde de la base (.db)
+                📥 Télécharger la sauvegarde de la base
               </button>
+
+              <button 
+                onClick={function() { if (restoreInputRef.current) restoreInputRef.current.click(); }} 
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: '#ffffff',
+                  color: '#059669',
+                  border: '2px solid #10b981',
+                  padding: '12px 20px',
+                  borderRadius: '10px',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                📤 Restaurer à partir d'un fichier de sauvegarde
+              </button>
+              
+              <input 
+                type="file" 
+                ref={restoreInputRef} 
+                onChange={handleRestoreFileSelect} 
+                style={{ display: 'none' }} 
+                accept=".db,.json" 
+              />
             </div>
           </div>
         </div>
