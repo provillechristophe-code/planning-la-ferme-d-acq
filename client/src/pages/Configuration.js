@@ -20,7 +20,10 @@ var s = {
   grid3: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 },
   statCard: { background: '#f8fafc', borderRadius: 12, padding: 20, textAlign: 'center' },
   statValue: { fontSize: 28, fontWeight: 800, color: '#1e293b' },
-  statLabel: { fontSize: 12, color: '#64748b', fontWeight: 600, marginTop: 4 }
+  statLabel: { fontSize: 12, color: '#64748b', fontWeight: 600, marginTop: 4 },
+  table: { width: '100%', borderCollapse: 'collapse', marginTop: 12, fontSize: 13 },
+  th: { background: '#f1f5f9', color: '#334155', padding: '10px 12px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', fontWeight: 700 },
+  td: { padding: '10px 12px', borderBottom: '1px solid #f1f5f9', color: '#475569' }
 };
 
 function Configuration() {
@@ -37,17 +40,23 @@ function Configuration() {
   var [batchForm, setBatchForm] = useState({ prefix: 'A', separator: '-', startNum: 1, count: 5, box_type: 'standard', capacity: 1, daily_rate: 30 });
   var [serviceForm, setServiceForm] = useState({ service_name: '', service_type: '', price: 0, description: '' });
 
+  // Base de données complète pour l'onglet visualiseur
+  var [dbData, setDbData] = useState({ clients: [], animals: [], boxes: [], reservations: [], invoices: [] });
+  var [selectedDbTable, setSelectedDbTable] = useState('clients');
+
   useEffect(function() { fetchData(); }, []);
 
   var fetchData = function() {
     Promise.all([
       axios.get('/api/config/config'),
       axios.get('/api/config/boxes'),
-      axios.get('/api/config/services')
+      axios.get('/api/config/services'),
+      axios.get('/api/config/db-tables')
     ]).then(function(results) {
       if (results[0].data) setConfigForm(results[0].data);
       setBoxes(results[1].data);
       setServices(results[2].data);
+      if (results[3].data) setDbData(results[3].data);
       setLoading(false);
     }).catch(function() { setLoading(false); });
   };
@@ -122,6 +131,41 @@ function Configuration() {
 
   if (loading) return <p style={{ padding: 40 }}>Chargement...</p>;
 
+  var renderDbTable = function() {
+    var rows = dbData[selectedDbTable] || [];
+    if (rows.length === 0) {
+      return <p style={{ color: '#94a3b8', padding: 16 }}>Aucun enregistrement trouvé dans cette table.</p>;
+    }
+    var headers = Object.keys(rows[0]);
+    return (
+      <div style={{ overflowX: 'auto' }}>
+        <table style={s.table}>
+          <thead>
+            <tr>
+              {headers.map(function(h) {
+                return <th key={h} style={s.th}>{h}</th>;
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(function(row, idx) {
+              return (
+                <tr key={row.id || idx}>
+                  {headers.map(function(h) {
+                    var val = row[h];
+                    if (val === null || val === undefined) val = '-';
+                    else if (typeof val === 'object') val = JSON.stringify(val);
+                    return <td key={h} style={s.td}>{String(val)}</td>;
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   return (
     <div style={s.page}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={function() { setToast(null); }} />}
@@ -133,6 +177,7 @@ function Configuration() {
         <button style={activeTab === 'general' ? s.tabActive : s.tab} onClick={function() { setActiveTab('general'); }}>🏢 Général</button>
         <button style={activeTab === 'boxes' ? s.tabActive : s.tab} onClick={function() { setActiveTab('boxes'); }}>📦 Boxes ({boxes.length})</button>
         <button style={activeTab === 'services' ? s.tabActive : s.tab} onClick={function() { setActiveTab('services'); }}>🛎️ Services ({services.length})</button>
+        <button style={activeTab === 'database' ? s.tabActive : s.tab} onClick={function() { setActiveTab('database'); }}>📊 Base de Données</button>
       </div>
 
       {activeTab === 'general' && (
@@ -268,6 +313,51 @@ function Configuration() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'database' && (
+        <div>
+          <div style={s.card}>
+            <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>📊</span> Visualiseur de la Base de Données
+            </h3>
+            <p style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>
+              Consultez directement le contenu brut enregistré dans les différentes tables de la base de données SQLite.
+            </p>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 20, marginBottom: 20, flexWrap: 'wrap' }}>
+              {[
+                { key: 'clients', label: '👤 Clients (' + (dbData.clients ? dbData.clients.length : 0) + ')' },
+                { key: 'animals', label: '🐾 Animaux (' + (dbData.animals ? dbData.animals.length : 0) + ')' },
+                { key: 'boxes', label: '📦 Boxes (' + (dbData.boxes ? dbData.boxes.length : 0) + ')' },
+                { key: 'reservations', label: '📅 Réservations (' + (dbData.reservations ? dbData.reservations.length : 0) + ')' },
+                { key: 'invoices', label: '💶 Factures (' + (dbData.invoices ? dbData.invoices.length : 0) + ')' }
+              ].map(function(t) {
+                var isActive = selectedDbTable === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    onClick={function() { setSelectedDbTable(t.key); }}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 10,
+                      border: isActive ? '2px solid #6366f1' : '1px solid #e2e8f0',
+                      background: isActive ? '#eef2ff' : '#f8fafc',
+                      color: isActive ? '#6366f1' : '#475569',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {renderDbTable()}
           </div>
         </div>
       )}

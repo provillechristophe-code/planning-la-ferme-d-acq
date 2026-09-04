@@ -7,15 +7,25 @@ router.get('/config', async (req, res) => {
   try {
     let config = await get('SELECT * FROM pension_config LIMIT 1');
     if (!config) {
-      await run(
-        'INSERT INTO pension_config (pension_name, total_boxes, default_daily_rate) VALUES (?, ?, ?)',
-        ['La Ferme d Acq', 10, 30]
-      );
+      try {
+        await run(
+          'INSERT INTO pension_config (pension_name, total_boxes, default_daily_rate) VALUES (?, ?, ?)',
+          ['La Ferme d Acq', 10, 30]
+        );
+      } catch (e) {
+        await run(
+          'INSERT INTO pension_config (pension_name, total_boxes) VALUES (?, ?)',
+          ['La Ferme d Acq', 10]
+        );
+      }
       config = await get('SELECT * FROM pension_config LIMIT 1');
     }
-    res.json(config);
+    if (config && config.default_daily_rate === undefined) {
+      config.default_daily_rate = 30;
+    }
+    res.json(config || { pension_name: 'La Ferme d Acq', total_boxes: 10, default_daily_rate: 30 });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.json({ pension_name: 'La Ferme d Acq', total_boxes: 10, default_daily_rate: 30 });
   }
 });
 
@@ -148,6 +158,20 @@ router.get('/availability/:startDate/:endDate', async (req, res) => {
     });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// Endpoint pour consulter l'ensemble des tables de la base de données
+router.get('/db-tables', async (req, res) => {
+  try {
+    const clients = await all('SELECT * FROM clients ORDER BY id DESC');
+    const animals = await all('SELECT * FROM animals ORDER BY id DESC');
+    const boxes = await all('SELECT * FROM boxes ORDER BY id ASC');
+    const reservations = await all('SELECT * FROM reservations ORDER BY id DESC');
+    const invoices = await all('SELECT * FROM invoices ORDER BY id DESC');
+    res.json({ clients, animals, boxes, reservations, invoices });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
