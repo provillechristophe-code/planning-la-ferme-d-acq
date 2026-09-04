@@ -133,6 +133,9 @@ router.post('/restore-full', async (req, res) => {
     const { clients, animals, boxes, reservations, invoices, services, config } = req.body;
     var restoredCounts = { clients: 0, animals: 0, boxes: 0, reservations: 0, invoices: 0, services: 0 };
 
+    // Désactiver temporairement les contraintes de clés étrangères pendant la réinsertion
+    try { await run('PRAGMA foreign_keys = OFF;'); } catch (e) {}
+
     if (clients && clients.length > 0) {
       for (const c of clients) {
         if (!c.name) continue;
@@ -248,9 +251,13 @@ router.post('/restore-full', async (req, res) => {
       );
     }
 
+    // Réactiver les clés étrangères
+    try { await run('PRAGMA foreign_keys = ON;'); } catch (e) {}
+
     res.json({ message: 'Restauration effectuée avec succès', counts: restoredCounts });
   } catch (err) {
     console.error('Erreur /restore-full :', err);
+    try { await run('PRAGMA foreign_keys = ON;'); } catch (e) {}
     res.status(400).json({ error: err.message });
   }
 });
