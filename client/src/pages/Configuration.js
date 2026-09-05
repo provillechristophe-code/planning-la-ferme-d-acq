@@ -189,15 +189,15 @@ function Configuration() {
   var renderDbCell = function(columnKey, val) {
     if (val === null || val === undefined) return '-';
     
-    // Remplacement explicite des ID par "ID (Nom / Numéro)" pour faciliter la lecture
+    // Afficher directement les noms en clair au lieu des numéros ID
     if (columnKey === 'client_id' && clientMap[val]) {
-      return val + ' (' + clientMap[val] + ')';
+      return clientMap[val];
     }
     if (columnKey === 'animal_id' && animalMap[val]) {
-      return val + ' (' + animalMap[val] + ')';
+      return animalMap[val];
     }
     if (columnKey === 'box_id' && boxMap[val]) {
-      return val + ' (Box ' + boxMap[val] + ')';
+      return 'Box ' + boxMap[val];
     }
     if (typeof val === 'object') return JSON.stringify(val);
     return String(val);
@@ -215,7 +215,11 @@ function Configuration() {
           <thead>
             <tr>
               {headers.map(function(h) {
-                return <th key={h} style={s.th}>{h}</th>;
+                var label = h;
+                if (h === 'client_id') label = 'Client';
+                else if (h === 'animal_id') label = 'Animal';
+                else if (h === 'box_id') label = 'Box';
+                return <th key={h} style={s.th}>{label}</th>;
               })}
               <th style={{ ...s.th, textAlign: 'center' }}>Action</th>
             </tr>
