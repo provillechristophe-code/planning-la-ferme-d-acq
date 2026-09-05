@@ -175,4 +175,47 @@ router.get('/db-tables', async (req, res) => {
   }
 });
 
+// Endpoint pour supprimer un enregistrement spécifique dans n'importe quelle table
+router.delete('/db-table-row/:table/:id', async (req, res) => {
+  try {
+    const { table, id } = req.params;
+    const allowedTables = ['clients', 'animals', 'boxes', 'reservations', 'invoices', 'services'];
+    
+    if (allowedTables.indexOf(table) === -1) {
+      return res.status(400).json({ error: 'Table non autorisée' });
+    }
+
+    try { await run('PRAGMA foreign_keys = OFF;'); } catch (e) {}
+
+    if (table === 'clients') {
+      const reservations = await all('SELECT id FROM reservations WHERE client_id = ?', [id]);
+      for (const r of reservations) {
+        await run('DELETE FROM reservation_services WHERE reservation_id = ?', [r.id]);
+      }
+      await run('DELETE FROM invoices WHERE client_id = ?', [id]);
+      await run('DELETE FROM reservations WHERE client_id = ?', [id]);
+      await run('DELETE FROM animals WHERE client_id = ?', [id]);
+    } else if (table === 'animals') {
+      const reservations = await all('SELECT id FROM reservations WHERE animal_id = ?', [id]);
+      for (const r of reservations) {
+        await run('DELETE FROM reservation_services WHERE reservation_id = ?', [r.id]);
+        await run('DELETE FROM invoices WHERE reservation_id = ?', [r.id]);
+      }
+      await run('DELETE FROM reservations WHERE animal_id = ?', [id]);
+    } else if (table === 'reservations') {
+      await run('DELETE FROM reservation_services WHERE reservation_id = ?', [id]);
+      await run('DELETE FROM invoices WHERE reservation_id = ?', [id]);
+    }
+
+    await run('DELETE FROM ' + table + ' WHERE id = ?', [id]);
+
+    try { await run('PRAGMA foreign_keys = ON;'); } catch (e) {}
+
+    res.json({ message: 'Enregistrement supprimé avec succès' });
+  } catch (err) {
+    try { await run('PRAGMA foreign_keys = ON;'); } catch (e) {}
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

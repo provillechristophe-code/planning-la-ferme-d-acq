@@ -134,6 +134,19 @@ function Configuration() {
     axios.delete('/api/config/boxes/' + box.id).then(function() { fetchData(); showToast('Box supprimé !'); });
   };
 
+  var handleDeleteDbRow = function(table, id) {
+    if (!window.confirm('Voulez-vous vraiment supprimer cet enregistrement de la base de données ?')) return;
+    axios.delete('/api/config/db-table-row/' + table + '/' + id)
+      .then(function() {
+        showToast('Enregistrement supprimé de la base de données !');
+        fetchData();
+      })
+      .catch(function(err) {
+        console.error('Erreur suppression ligne base :', err);
+        showToast('Erreur lors de la suppression.', 'error');
+      });
+  };
+
   var batchPreview = function() {
     var names = []; var start = parseInt(batchForm.startNum) || 1; var count = parseInt(batchForm.count) || 1;
     for (var i = 0; i < count; i++) { var num = start + i; var numStr = num < 10 ? '0' + num : '' + num; names.push(batchForm.prefix + batchForm.separator + numStr); }
@@ -177,6 +190,7 @@ function Configuration() {
               {headers.map(function(h) {
                 return <th key={h} style={s.th}>{h}</th>;
               })}
+              <th style={{ ...s.th, textAlign: 'center' }}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -189,6 +203,17 @@ function Configuration() {
                     else if (typeof val === 'object') val = JSON.stringify(val);
                     return <td key={h} style={s.td}>{String(val)}</td>;
                   })}
+                  <td style={{ ...s.td, textAlign: 'center' }}>
+                    {row.id && (
+                      <button 
+                        onClick={function() { handleDeleteDbRow(selectedDbTable, row.id); }} 
+                        style={s.btnDanger}
+                        title="Supprimer cet enregistrement"
+                      >
+                        🗑️ Supprimer
+                      </button>
+                    )}
+                  </td>
                 </tr>
               );
             })}
@@ -384,7 +409,7 @@ function Configuration() {
               <span>📊</span> Visualiseur de la Base de Données
             </h3>
             <p style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>
-              Consultez directement le contenu brut enregistré dans les différentes tables de la base de données SQLite.
+              Consultez et nettoyez directement le contenu brut enregistré dans les différentes tables de la base de données SQLite.
             </p>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 20, marginBottom: 20, flexWrap: 'wrap' }}>
