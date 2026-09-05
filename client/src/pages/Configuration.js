@@ -176,6 +176,33 @@ function Configuration() {
 
   if (loading) return <p style={{ padding: 40 }}>Chargement...</p>;
 
+  // Dictionnaires de correspondance ID -> Libellé lisible
+  var clientMap = {};
+  (dbData.clients || []).forEach(function(c) { clientMap[c.id] = c.name; });
+
+  var animalMap = {};
+  (dbData.animals || []).forEach(function(a) { animalMap[a.id] = a.name; });
+
+  var boxMap = {};
+  (dbData.boxes || []).forEach(function(b) { boxMap[b.id] = b.box_number; });
+
+  var renderDbCell = function(columnKey, val) {
+    if (val === null || val === undefined) return '-';
+    
+    // Remplacement explicite des ID par "ID (Nom / Numéro)" pour faciliter la lecture
+    if (columnKey === 'client_id' && clientMap[val]) {
+      return val + ' (' + clientMap[val] + ')';
+    }
+    if (columnKey === 'animal_id' && animalMap[val]) {
+      return val + ' (' + animalMap[val] + ')';
+    }
+    if (columnKey === 'box_id' && boxMap[val]) {
+      return val + ' (Box ' + boxMap[val] + ')';
+    }
+    if (typeof val === 'object') return JSON.stringify(val);
+    return String(val);
+  };
+
   var renderDbTable = function() {
     var rows = dbData[selectedDbTable] || [];
     if (rows.length === 0) {
@@ -198,10 +225,7 @@ function Configuration() {
               return (
                 <tr key={row.id || idx}>
                   {headers.map(function(h) {
-                    var val = row[h];
-                    if (val === null || val === undefined) val = '-';
-                    else if (typeof val === 'object') val = JSON.stringify(val);
-                    return <td key={h} style={s.td}>{String(val)}</td>;
+                    return <td key={h} style={s.td}>{renderDbCell(h, row[h])}</td>;
                   })}
                   <td style={{ ...s.td, textAlign: 'center' }}>
                     {row.id && (
