@@ -13,7 +13,7 @@ var s = {
   statIcon: { width: 42, height: 42, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 },
   statValue: { fontSize: 22, fontWeight: 800, color: '#1e293b', lineHeight: 1 },
   statLabel: { fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 },
-  grid: { display: 'grid', gridTemplateColumns: '420px 1fr', gap: 24, alignItems: 'flex-start' },
+  grid: { display: 'grid', gridTemplateColumns: '460px 1fr', gap: 24, alignItems: 'flex-start' },
   card: { background: '#ffffff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' },
   cardHeader: { padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 12 },
   cardIcon: { width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 },
@@ -59,7 +59,14 @@ function Invoices() {
   var [invoices, setInvoices] = useState([]);
   var [reservations, setReservations] = useState([]);
   var [clients, setClients] = useState([]);
-  var [form, setForm] = useState({ reservation_id: '', client_id: '' });
+  var [animals, setAnimals] = useState([]);
+
+  // Mode de facturation : 'single' (par réservation) ou 'grouped' (regroupé par client)
+  var [invoiceMode, setInvoiceMode] = useState('grouped');
+
+  var [selectedClientId, setSelectedClientId] = useState('');
+  var [selectedReservationIds, setSelectedReservationIds] = useState([]);
+
   var [calculation, setCalculation] = useState(null);
   var [loading, setLoading] = useState(true);
   var [printingInvoiceId, setPrintingInvoiceId] = useState(null);
@@ -70,27 +77,110 @@ function Invoices() {
   useEffect(function() { fetchData(); }, []);
 
   var fetchData = function() {
-    Promise.all([axios.get('/api/invoices'), axios.get('/api/reservations'), axios.get('/api/clients')]).then(function(results) {
-      setInvoices(results[0].data); setReservations(results[1].data); setClients(results[2].data); setLoading(false);
-    }).catch(function(err) { console.error(err); setLoading(false); });
-  };
-
-  var getClientName = function(clientId) { var c = clients.find(function(x) { return x.id === clientId; }); return c && c.name ? c.name : 'Client #' + clientId; };
-
-  var handleCalculate = function(e) {
-    e.preventDefault();
-    if (!form.reservation_id) { showToast('Sélectionnez une réservation', 'error'); return; }
-    axios.post('/api/invoices/calculate', { reservation_id: form.reservation_id }).then(function(res) { setCalculation(res.data); }).catch(function(err) {
-      var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur';
-      showToast('Erreur: ' + msg, 'error');
+    Promise.all([
+      axios.get('/api/invoices'),
+      axios.get('/api/reservations'),
+      axios.get('/api/clients'),
+      axios.get('/api/animals')
+    ]).then(function(results) {
+      setInvoices(results[0].data);
+      setReservations(results[1].data);
+      setClients(results[2].data);
+      setAnimals(results[3].data);
+      setLoading(false);
+    }).catch(function(err) {
+      console.error(err);
+      setLoading(false);
     });
   };
 
+  var getClientName = function(clientId) {
+    var c = clients.find(function(x) { return x.id === clientId; });
+    return c && c.name ? c.name : 'Client #' + clientId;
+  };
+
+  var getAnimalName = function(animalId) {
+    var a = animals.find(function(x) { return x.id === animalId; });
+    return a && a.name ? a.name : 'Animal #' + animalId;
+  };
+
+  // Liste des réservations déjà facturées (comprend les factures regroupées)
+  var invoicedReservationIds = [];
+  invoices.forEach(function(inv) {
+    if (inv.notes) {
+      try {
+        var parsed = JSON.parse(inv.notes);
+        if (parsed.reservation_ids && Array.isArray(parsed.reservation_ids)) {
+          parsed.reservation_ids.forEach(function(id) { invoicedReservationIds.push(String(id)); });
+          return;
+        }
+      } catch (e) {}
+    }
+    invoicedReservationIds.push(String(inv.reservation_id));
+  });
+
+  // Réservations non facturées
+  var unbilledReservations = reservations.filter(function(r) {
+    return r.status !== 'cancelled' && invoicedReservationIds.indexOf(String(r.id)) === -1;
+  });
+
+  // Réservations non facturées pour le client sélectionné
+  var clientUnbilledReservations = unbilledReservations.filter(function(r) {
+    return String(r.client_id) === String(selectedClientId);
+  });
+
+  var handleClientChange = function(clientId) {
+    setSelectedClientId(clientId);
+    var clientRes = unbilledReservations.filter(function(r) { return String(r.client_id) === String(clientId); });
+    setSelectedReservationIds(clientRes.map(function(r) { return r.id; }));
+    setCalculation(null);
+  };
+
+  var toggleReservationCheck = function(id) {
+    if (selectedReservationIds.indexOf(id) !== -1) {
+      setSelectedReservationIds(selectedReservationIds.filter(function(x) { return x !== id; }));
+    } else {
+      setSelectedReservationIds([...selectedReservationIds, id]);
+    }
+    setCalculation(null);
+  };
+
+  var handleCalculate = function(e) {
+    if (e) e.preventDefault();
+    if (selectedReservationIds.length === 0) {
+      showToast('Sélectionnez au moins une réservation', 'error');
+      return;
+    }
+    axios.post('/api/invoices/calculate', { reservation_ids: selectedReservationIds })
+      .then(function(res) {
+        setCalculation(res.data);
+      })
+      .catch(function(err) {
+        var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur';
+        showToast('Erreur: ' + msg, 'error');
+      });
+  };
+
   var handleCreateInvoice = function() {
-    if (!form.reservation_id || !form.client_id) { showToast('Remplissez tous les champs', 'error'); return; }
-    axios.post('/api/invoices', { reservation_id: form.reservation_id, client_id: form.client_id }).then(function() {
-      setForm({ reservation_id: '', client_id: '' }); setCalculation(null); fetchData(); showToast('Facture créée !');
-    }).catch(function(err) { var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur'; showToast('Erreur: ' + msg, 'error'); });
+    if (!selectedClientId || selectedReservationIds.length === 0) {
+      showToast('Sélectionnez un client et au moins une réservation', 'error');
+      return;
+    }
+    axios.post('/api/invoices', {
+      client_id: selectedClientId,
+      reservation_ids: selectedReservationIds
+    })
+      .then(function() {
+        setSelectedClientId('');
+        setSelectedReservationIds([]);
+        setCalculation(null);
+        fetchData();
+        showToast('Facture créée avec succès !');
+      })
+      .catch(function(err) {
+        var msg = err.response && err.response.data && err.response.data.error ? err.response.data.error : 'Erreur';
+        showToast('Erreur: ' + msg, 'error');
+      });
   };
 
   var handleMarkPaid = function(inv) {
@@ -114,12 +204,6 @@ function Invoices() {
   var totalAmount = invoices.reduce(function(sum, i) { return sum + safeNum(i.total); }, 0);
   var filteredInvoices = invoices.filter(function(inv) { if (filter === 'all') return true; if (filter === 'paid') return inv.payment_status === 'paid'; if (filter === 'pending') return inv.payment_status !== 'paid'; return true; });
 
-  // Exclure les réservations annulées ou déjà facturées de la liste des réservations à émettre
-  var invoicedReservationIds = invoices.map(function(inv) { return String(inv.reservation_id); });
-  var unbilledReservations = reservations.filter(function(r) {
-    return r.status !== 'cancelled' && invoicedReservationIds.indexOf(String(r.id)) === -1;
-  });
-
   if (loading) return <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8' }}>Chargement...</div>;
   if (printingInvoiceId) return <InvoicePrint invoiceId={printingInvoiceId} onClose={function() { setPrintingInvoiceId(null); }} />;
 
@@ -130,7 +214,7 @@ function Invoices() {
       <div style={s.headerRow}>
         <div>
           <h2 style={s.headerTitle}>💶 Facturation</h2>
-          <p style={s.headerSub}>Gérez vos factures et encaissements</p>
+          <p style={s.headerSub}>Gérez vos factures individuelles ou regroupées par client</p>
         </div>
       </div>
 
@@ -146,50 +230,112 @@ function Invoices() {
           <div style={s.card}>
             <div style={s.cardHeader}>
               <div style={Object.assign({}, s.cardIcon, { background: '#dbeafe' })}>🧮</div>
-              <div><h3 style={s.cardTitle}>Calculer une facture</h3><p style={s.cardSub}>Depuis une réservation</p></div>
+              <div><h3 style={s.cardTitle}>Créer une facture</h3><p style={s.cardSub}>Regroupée par client ou par séjour</p></div>
             </div>
             <div style={s.cardBody}>
-              <form onSubmit={handleCalculate}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+                <button 
+                  onClick={function() { setInvoiceMode('grouped'); setCalculation(null); }} 
+                  style={{
+                    flex: 1, padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    border: invoiceMode === 'grouped' ? '2px solid #6366f1' : '1px solid #e2e8f0',
+                    background: invoiceMode === 'grouped' ? '#eef2ff' : '#ffffff',
+                    color: invoiceMode === 'grouped' ? '#6366f1' : '#64748b'
+                  }}
+                >
+                  🐕🐈 Facture Regroupée (Multi-animaux)
+                </button>
+                <button 
+                  onClick={function() { setInvoiceMode('single'); setCalculation(null); }} 
+                  style={{
+                    flex: 1, padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    border: invoiceMode === 'single' ? '2px solid #6366f1' : '1px solid #e2e8f0',
+                    background: invoiceMode === 'single' ? '#eef2ff' : '#ffffff',
+                    color: invoiceMode === 'single' ? '#6366f1' : '#64748b'
+                  }}
+                >
+                  📄 Par réservation
+                </button>
+              </div>
+
+              <div style={s.formGroup}>
+                <label style={s.label}>1. Sélectionner un client</label>
+                <select style={s.select} value={selectedClientId} onChange={function(e) { handleClientChange(e.target.value); }}>
+                  <option value="">-- Sélectionner le client à facturer --</option>
+                  {clients.map(function(c) {
+                    var count = unbilledReservations.filter(function(r) { return String(r.client_id) === String(c.id); }).length;
+                    return (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {count > 0 ? '(' + count + ' séjour' + (count > 1 ? 's' : '') + ' à facturer)' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {selectedClientId && (
                 <div style={s.formGroup}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <label style={s.label}>Réservation à émettre</label>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#6366f1', background: '#eef2ff', padding: '2px 8px', borderRadius: 20 }}>
-                      {unbilledReservations.length} à facturer
-                    </span>
-                  </div>
-                  <select style={s.select} value={form.reservation_id} onChange={function(e) { var rid = e.target.value; var r = reservations.find(function(x) { return String(x.id) === String(rid); }); setForm({ reservation_id: rid, client_id: r ? r.client_id : '' }); }} required>
-                    <option value="">-- Sélectionner une réservation non facturée --</option>
-                    {unbilledReservations.map(function(r) { return <option key={r.id} value={r.id}>#{r.id} - {getClientName(r.client_id)} ({r.check_in} → {r.check_out})</option>; })}
-                  </select>
-                  {unbilledReservations.length === 0 && (
-                    <p style={{ fontSize: 12, color: '#10b981', marginTop: 6, fontWeight: 600 }}>✓ Toutes les réservations ont été facturées ! Aucune facture en attente d'émission.</p>
+                  <label style={s.label}>2. Séjours / Animaux à inclure dans la facture</label>
+                  {clientUnbilledReservations.length === 0 ? (
+                    <p style={{ fontSize: 13, color: '#10b981', fontWeight: 600, background: '#f0fdf4', padding: 12, borderRadius: 8 }}>
+                      ✓ Aucune réservation en attente pour ce client.
+                    </p>
+                  ) : (
+                    <div style={{ background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0', padding: 12 }}>
+                      {clientUnbilledReservations.map(function(r) {
+                        var isChecked = selectedReservationIds.indexOf(r.id) !== -1;
+                        return (
+                          <label key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                            <input 
+                              type="checkbox" 
+                              checked={isChecked} 
+                              onChange={function() { toggleReservationCheck(r.id); }}
+                              style={{ width: 18, height: 18, accentColor: '#6366f1' }}
+                            />
+                            <span>
+                              🐾 <strong>{getAnimalName(r.animal_id)}</strong> ({r.check_in} → {r.check_out}) - {r.daily_rate}€/j
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-                <button type="submit" style={s.btnCalc}>🧮 Calculer</button>
-              </form>
+              )}
+
+              {selectedReservationIds.length > 0 && (
+                <button type="button" style={s.btnCalc} onClick={handleCalculate}>
+                  🧮 Calculer le montant total HT & TTC
+                </button>
+              )}
 
               {calculation && (
                 <div style={s.calcResult}>
-                  <div style={s.calcHeader}><h4 style={s.calcTitle}>📊 Détail</h4></div>
+                  <div style={s.calcHeader}>
+                    <h4 style={s.calcTitle}>📊 Détail des {calculation.count} séjour(s) inclus</h4>
+                  </div>
                   <div style={s.calcBody}>
-                    <div style={s.calcRow}><span style={s.calcLabel}>Durée</span><span style={s.calcValue}>{calculation.days} jours</span></div>
-                    <div style={s.calcRow}><span style={s.calcLabel}>Tarif/jour</span><span style={s.calcValue}>{calculation.boxRate}€</span></div>
-                    <div style={s.calcRow}><span style={s.calcLabel}>Pension</span><span style={Object.assign({}, s.calcValue, { color: '#3b82f6' })}>{safeNum(calculation.boxAmount).toFixed(2)}€</span></div>
-                    <div style={s.calcRow}><span style={s.calcLabel}>Services</span><span style={Object.assign({}, s.calcValue, { color: '#8b5cf6' })}>{safeNum(calculation.servicesAmount).toFixed(2)}€</span></div>
+                    {(calculation.items || []).map(function(item, idx) {
+                      return (
+                        <div key={item.reservation_id || idx} style={{ marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid #e2e8f0' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+                            🐾 {item.animal_name} ({item.days} j x {item.boxRate}€/j = {item.boxAmount.toFixed(2)}€)
+                          </div>
+                          <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                            Séjour du {item.check_in} au {item.check_out}
+                            {item.servicesAmount > 0 && ' + Services : ' + item.servicesAmount.toFixed(2) + '€'}
+                          </div>
+                        </div>
+                      );
+                    })}
+
                     <div style={s.calcRow}><span style={s.calcLabel}>Sous-total HT</span><span style={s.calcValue}>{safeNum(calculation.subtotal).toFixed(2)}€</span></div>
                     <div style={s.calcRow}><span style={s.calcLabel}>TVA ({safeNum(calculation.taxRate).toFixed(0)}%)</span><span style={Object.assign({}, s.calcValue, { color: '#ef4444' })}>{safeNum(calculation.tax).toFixed(2)}€</span></div>
                     <div style={s.calcTotal}><span style={s.calcTotalLabel}>TOTAL TTC</span><span style={s.calcTotalValue}>{safeNum(calculation.total).toFixed(2)}€</span></div>
-                    <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px dashed #e2e8f0' }}>
-                      <div style={s.formGroup}>
-                        <label style={s.label}>Client</label>
-                        <p style={s.helper}>Rempli automatiquement.</p>
-                        <select style={s.select} value={form.client_id} onChange={function(e) { setForm({ reservation_id: form.reservation_id, client_id: e.target.value }); }} required disabled={!!form.reservation_id}>
-                          <option value="">-- Client --</option>
-                          {clients.map(function(c) { return <option key={c.id} value={c.id}>{c.name}</option>; })}
-                        </select>
-                      </div>
-                      <button type="button" style={s.btnCreate} onClick={handleCreateInvoice}>✓ Créer la facture</button>
-                    </div>
+                    
+                    <button type="button" style={s.btnCreate} onClick={handleCreateInvoice}>
+                      ✓ Générer la facture unique ({safeNum(calculation.total).toFixed(2)}€)
+                    </button>
                   </div>
                 </div>
               )}
@@ -217,12 +363,26 @@ function Invoices() {
               <div>
                 {filteredInvoices.map(function(inv) {
                   var statusStyle = getStatusStyle(inv.payment_status);
+                  var isMulti = false;
+                  var itemsCount = 1;
+                  if (inv.notes) {
+                    try {
+                      var p = JSON.parse(inv.notes);
+                      if (p.items && p.items.length > 1) {
+                        isMulti = true;
+                        itemsCount = p.items.length;
+                      }
+                    } catch (e) {}
+                  }
+
                   return (
                     <div key={inv.id} style={s.invCard}>
                       <div style={s.invLeft}>
                         <div style={Object.assign({}, s.invIcon, { background: statusStyle.background })}>{inv.payment_status === 'paid' ? '✓' : '📄'}</div>
                         <div>
-                          <div style={s.invNumber}>Facture #{inv.id}</div>
+                          <div style={s.invNumber}>
+                            Facture #{inv.id} {isMulti && <span style={{ fontSize: 11, background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: 10, marginLeft: 6 }}>🐾 Multi ({itemsCount} chiens)</span>}
+                          </div>
                           <div style={s.invMeta}>👤 {getClientName(inv.client_id)}</div>
                           <div style={{ marginTop: 6 }}><span style={Object.assign({}, s.statusBadge, statusStyle)}>{getStatusLabel(inv.payment_status)}</span></div>
                         </div>
@@ -235,7 +395,7 @@ function Invoices() {
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           {inv.payment_status !== 'paid' && <button style={s.btnPaid} onClick={function() { handleMarkPaid(inv); }}>✓ Payée</button>}
-                          <button style={s.btnPrint} onClick={function() { setPrintingInvoiceId(inv.id); }}>🖨️</button>
+                          <button style={s.btnPrint} onClick={function() { setPrintingInvoiceId(inv.id); }}>🖨️ Imprimer</button>
                           <button style={s.btnDelete} onClick={function() { handleDelete(inv); }}>🗑️</button>
                         </div>
                       </div>

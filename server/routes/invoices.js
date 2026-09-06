@@ -12,130 +12,164 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Calculer le montant d'une réservation (box + services)
+// Helper pour calculer une réservation
+const calculateSingleReservation = async (reservation_id) => {
+  const reservation = await get('SELECT * FROM reservations WHERE id = ?', [reservation_id]);
+  if (!reservation) return null;
+
+  const animal = await get('SELECT * FROM animals WHERE id = ?', [reservation.animal_id]);
+  const start = new Date(reservation.check_in);
+  const end = new Date(reservation.check_out);
+  const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+
+  const boxRate = reservation.daily_rate || 0;
+  const boxAmount = boxRate * days;
+
+  const services = await all(
+    `SELECT rs.*, s.service_name FROM reservation_services rs
+     JOIN services s ON rs.service_id = s.id
+     WHERE rs.reservation_id = ?`,
+    [reservation_id]
+  );
+
+  const servicesAmount = services.reduce((sum, s) => sum + (s.unit_price * s.quantity), 0);
+  const subtotal = boxAmount + servicesAmount;
+
+  return {
+    reservation_id,
+    animal_id: reservation.animal_id,
+    animal_name: animal ? animal.name : 'Animal #' + reservation.animal_id,
+    check_in: reservation.check_in,
+    check_out: reservation.check_out,
+    days,
+    boxRate,
+    boxAmount,
+    services,
+    servicesAmount,
+    subtotal
+  };
+};
+
+// Calculer le montant d'une ou plusieurs réservations
 router.post('/calculate', async (req, res) => {
   try {
-    const { reservation_id } = req.body;
-    const reservation = await get('SELECT * FROM reservations WHERE id = ?', [reservation_id]);
-    
-    if (!reservation) return res.status(404).json({ error: 'Réservation non trouvée' });
-    
-    // Calcul de la durée
-    const start = new Date(reservation.check_in);
-    const end = new Date(reservation.check_out);
-    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-    
-    // Tarif box
-    const boxRate = reservation.daily_rate || 0;
-    const boxAmount = boxRate * days;
-    
-    // Services additionnels
-    const services = await all(
-      `SELECT rs.*, s.service_name FROM reservation_services rs
-       JOIN services s ON rs.service_id = s.id
-       WHERE rs.reservation_id = ?`,
-      [reservation_id]
-    );
-    
-    const servicesAmount = services.reduce((sum, s) => sum + (s.unit_price * s.quantity), 0);
-    
-    // Sous-total
-    const subtotal = boxAmount + servicesAmount;
-    
+    const { reservation_id, reservation_ids } = req.body;
+    let ids = [];
+
+    if (reservation_ids && Array.isArray(reservation_ids) && reservation_ids.length > 0) {
+      ids = reservation_ids;
+    } else if (reservation_id) {
+      ids = [reservation_id];
+    }
+
+    if (ids.length === 0) {
+      return res.status(400).json({ error: 'Aucune réservation sélectionnée' });
+    }
+
+    const items = [];
+    let totalSubtotal = 0;
+
+    for (const rid of ids) {
+      const calc = await calculateSingleReservation(rid);
+      if (calc) {
+        items.push(calc);
+        totalSubtotal += calc.subtotal;
+      }
+    }
+
+    if (items.length === 0) {
+      return res.status(404).json({ error: 'Réservations non trouvées' });
+    }
+
     // Récupérer le taux de TVA
-const config = await get('SELECT tax_rate FROM pension_config LIMIT 1');
-var taxRate = 0.2;
+    const config = await get('SELECT tax_rate FROM pension_config LIMIT 1');
+    let taxRate = 0.2;
+    if (config && config.tax_rate !== undefined && config.tax_rate !== null) {
+      taxRate = Number(config.tax_rate);
+    }
+    if (isNaN(taxRate) || taxRate < 0.001) taxRate = 0;
 
-if (config && config.tax_rate !== undefined && config.tax_rate !== null) {
-  taxRate = Number(config.tax_rate);
-}
+    const tax = totalSubtotal * taxRate;
+    const total = totalSubtotal + tax;
 
-if (isNaN(taxRate) || taxRate < 0.001) {
-  taxRate = 0;
-}
-    const tax = subtotal * taxRate;
-    
-    const total = subtotal + tax;
-    
     res.json({
-      days,
-      boxRate,
-      boxAmount,
-      services,
-      servicesAmount,
-      subtotal,
+      items,
+      count: items.length,
+      subtotal: totalSubtotal,
       taxRate: taxRate * 100,
       tax,
-      total,
-      breakdown: {
-        'Pension': `${boxAmount.toFixed(2)}€`,
-        'Services': `${servicesAmount.toFixed(2)}€`,
-        'Sous-total': `${subtotal.toFixed(2)}€`,
-        'TVA': `${tax.toFixed(2)}€ (${(taxRate * 100).toFixed(0)}%)`,
-        'Total': `${total.toFixed(2)}€`
-      }
+      total
     });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-// Créer une facture avec calcul automatique
+// Créer une facture (unique ou regroupée)
 router.post('/', async (req, res) => {
   try {
-    const { reservation_id, client_id } = req.body;
-    const reservation = await get('SELECT * FROM reservations WHERE id = ?', [reservation_id]);
-    
-    if (!reservation) return res.status(404).json({ error: 'Réservation non trouvée' });
-    
-    // Calcul automatique
-    const start = new Date(reservation.check_in);
-    const end = new Date(reservation.check_out);
-    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-    
-    const boxAmount = reservation.daily_rate * days;
-    
-    // Services
-    const services = await all(
-      `SELECT SUM(unit_price * quantity) as total FROM reservation_services WHERE reservation_id = ?`,
-      [reservation_id]
-    );
-    
-  const servicesAmount = (services[0] && services[0].total) ? services[0].total : 0;
+    const { reservation_id, reservation_ids, client_id } = req.body;
+    let ids = [];
 
+    if (reservation_ids && Array.isArray(reservation_ids) && reservation_ids.length > 0) {
+      ids = reservation_ids;
+    } else if (reservation_id) {
+      ids = [reservation_id];
+    }
 
-    const subtotal = boxAmount + servicesAmount;
-    
+    if (ids.length === 0 || !client_id) {
+      return res.status(400).json({ error: 'Réservation(s) et client obligatoires' });
+    }
+
+    const items = [];
+    let totalSubtotal = 0;
+
+    for (const rid of ids) {
+      const calc = await calculateSingleReservation(rid);
+      if (calc) {
+        items.push(calc);
+        totalSubtotal += calc.subtotal;
+      }
+    }
+
+    if (items.length === 0) {
+      return res.status(404).json({ error: 'Réservation(s) introuvable(s)' });
+    }
+
     // TVA
-const config = await get('SELECT tax_rate FROM pension_config LIMIT 1');
-var taxRate = 0.2;
+    const config = await get('SELECT tax_rate FROM pension_config LIMIT 1');
+    let taxRate = 0.2;
+    if (config && config.tax_rate !== undefined && config.tax_rate !== null) {
+      taxRate = Number(config.tax_rate);
+    }
+    if (isNaN(taxRate) || taxRate < 0.001) taxRate = 0;
 
-if (config && config.tax_rate !== undefined && config.tax_rate !== null) {
-  taxRate = Number(config.tax_rate);
-}
+    const tax = totalSubtotal * taxRate;
+    const total = totalSubtotal + tax;
 
-if (isNaN(taxRate) || taxRate < 0.001) {
-  taxRate = 0;
-}
-    const tax = subtotal * taxRate;
-    const total = subtotal + tax;
-    
     const invoice_date = new Date().toISOString().split('T')[0];
     const due_date = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    
+
+    const notesObj = {
+      type: items.length > 1 ? 'grouped' : 'single',
+      reservation_ids: ids,
+      items
+    };
+
+    const primaryReservationId = ids[0];
+
     const id = await run(
       `INSERT INTO invoices (reservation_id, client_id, amount, tax, total, invoice_date, due_date, notes) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [reservation_id, client_id, subtotal, tax, total, invoice_date, due_date, `Facture auto-générée pour ${days} jours`]
+      [primaryReservationId, client_id, totalSubtotal, tax, total, invoice_date, due_date, JSON.stringify(notesObj)]
     );
-    
+
     res.json({
       id,
-      message: 'Facture créée',
+      message: 'Facture créée avec succès',
       details: {
-        boxAmount,
-        servicesAmount,
-        subtotal,
+        count: items.length,
+        subtotal: totalSubtotal,
         tax,
         total
       }
@@ -168,6 +202,7 @@ router.put('/:id', async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
+
 // Marquer une facture comme payée
 router.put('/:id/pay', async (req, res) => {
   try {
@@ -180,6 +215,7 @@ router.put('/:id/pay', async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
+
 // Supprimer une facture
 router.delete('/:id', async (req, res) => {
   try {

@@ -7,35 +7,51 @@ function InvoicePrint({ invoiceId, onClose }) {
   var [reservation, setReservation] = useState(null);
   var [client, setClient] = useState(null);
   var [animal, setAnimal] = useState(null);
+  var [items, setItems] = useState([]);
   var [loading, setLoading] = useState(true);
 
   useEffect(function() {
+    var fetchData = function() {
+      axios.get('/api/invoices/' + invoiceId).then(function(invRes) {
+        var inv = invRes.data;
+        setInvoice(inv);
+
+        var parsedItems = [];
+        if (inv.notes) {
+          try {
+            var parsedNotes = JSON.parse(inv.notes);
+            if (parsedNotes.items && Array.isArray(parsedNotes.items)) {
+              parsedItems = parsedNotes.items;
+            }
+          } catch (e) {}
+        }
+
+        setItems(parsedItems);
+
+        return Promise.all([
+          axios.get('/api/reservations/' + inv.reservation_id),
+          axios.get('/api/clients/' + inv.client_id)
+        ]);
+      }).then(function(results) {
+        setReservation(results[0].data);
+        setClient(results[1].data);
+
+        if (results[0].data && results[0].data.animal_id) {
+          axios.get('/api/animals/' + results[0].data.animal_id).then(function(animalRes) {
+            setAnimal(animalRes.data);
+            setLoading(false);
+          }).catch(function() { setLoading(false); });
+        } else {
+          setLoading(false);
+        }
+      }).catch(function(err) {
+        console.error(err);
+        setLoading(false);
+      });
+    };
+
     fetchData();
   }, [invoiceId]);
-
-  var fetchData = function() {
-    axios.get('/api/invoices/' + invoiceId).then(function(invRes) {
-      setInvoice(invRes.data);
-      return Promise.all([
-        axios.get('/api/reservations/' + invRes.data.reservation_id),
-        axios.get('/api/clients/' + invRes.data.client_id)
-      ]);
-    }).then(function(results) {
-      setReservation(results[0].data);
-      setClient(results[1].data);
-      if (results[0].data && results[0].data.animal_id) {
-        axios.get('/api/animals/' + results[0].data.animal_id).then(function(animalRes) {
-          setAnimal(animalRes.data);
-          setLoading(false);
-        }).catch(function() { setLoading(false); });
-      } else {
-        setLoading(false);
-      }
-    }).catch(function(err) {
-      console.error(err);
-      setLoading(false);
-    });
-  };
 
   var handlePrint = function() {
     window.print();
@@ -45,7 +61,7 @@ function InvoicePrint({ invoiceId, onClose }) {
     if (!reservation) return 0;
     var start = new Date(reservation.check_in);
     var end = new Date(reservation.check_out);
-    return Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    return Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
   };
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>Chargement de la facture...</div>;
@@ -67,7 +83,7 @@ function InvoicePrint({ invoiceId, onClose }) {
           <div className="company-info">
             <h1>🐾 La Ferme d'Acq</h1>
             <p>Pension Animalière</p>
-            <p>chaussee brunehaut : Acq, 62144</p>
+            <p>Chaussée Brunehaut : Acq, 62144</p>
             <p>Tél : 06 10 10 65 68</p>
             <p>Email : christophe.proville@free.fr</p>
           </div>
@@ -90,41 +106,87 @@ function InvoicePrint({ invoiceId, onClose }) {
           </div>
         </div>
 
-        {animal && (
+        {items.length > 0 ? (
           <div className="invoice-section">
-            <div className="section-title">Animal :</div>
-            <div className="client-info">
-              <p><strong>{animal.name}</strong> - {animal.species} {animal.breed ? '(' + animal.breed + ')' : ''}</p>
+            <div className="section-title">Détail des animaux & séjours inclus :</div>
+            <table className="invoice-table">
+              <thead>
+                <tr>
+                  <th>Animal & Période</th>
+                  <th>Durée</th>
+                  <th>Tarif unitaire</th>
+                  <th>Montant</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(function(item, idx) {
+                  return (
+                    <React.Fragment key={item.reservation_id || idx}>
+                      <tr>
+                        <td>
+                          <strong>🐾 {item.animal_name}</strong>
+                          <br />
+                          <small style={{ color: '#64748b' }}>Du {item.check_in} au {item.check_out}</small>
+                        </td>
+                        <td>{item.days} jour(s)</td>
+                        <td>{item.boxRate}€/jour</td>
+                        <td>{item.boxAmount.toFixed(2)}€</td>
+                      </tr>
+                      {item.services && item.services.map(function(srv, sIdx) {
+                        return (
+                          <tr key={sIdx} style={{ backgroundColor: '#f8fafc', fontSize: 12 }}>
+                            <td style={{ paddingLeft: 24 }}>🛎️ {srv.service_name} (x{srv.quantity})</td>
+                            <td>—</td>
+                            <td>{srv.unit_price.toFixed(2)}€</td>
+                            <td>{(srv.unit_price * srv.quantity).toFixed(2)}€</td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <>
+            {animal && (
+              <div className="invoice-section">
+                <div className="section-title">Animal :</div>
+                <div className="client-info">
+                  <p><strong>{animal.name}</strong> - {animal.species} {animal.breed ? '(' + animal.breed + ')' : ''}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="invoice-section">
+              <div className="section-title">Période de séjour :</div>
+              <div className="client-info">
+                <p>Du <strong>{reservation ? reservation.check_in : '—'}</strong> au <strong>{reservation ? reservation.check_out : '—'}</strong></p>
+                <p>Durée : <strong>{getDays()} jour(s)</strong></p>
+              </div>
             </div>
-          </div>
+
+            <table className="invoice-table">
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th>Durée</th>
+                  <th>Tarif unitaire</th>
+                  <th>Montant</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Pension animalière - {animal ? animal.name : 'Animal'}</td>
+                  <td>{getDays()} jour(s)</td>
+                  <td>{reservation ? reservation.daily_rate : '—'}€/jour</td>
+                  <td>{invoice.amount.toFixed(2)}€</td>
+                </tr>
+              </tbody>
+            </table>
+          </>
         )}
-
-        <div className="invoice-section">
-          <div className="section-title">Période de séjour :</div>
-          <div className="client-info">
-            <p>Du <strong>{reservation ? reservation.check_in : '—'}</strong> au <strong>{reservation ? reservation.check_out : '—'}</strong></p>
-            <p>Durée : <strong>{getDays()} jour(s)</strong></p>
-          </div>
-        </div>
-
-        <table className="invoice-table">
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th>Durée</th>
-              <th>Tarif unitaire</th>
-              <th>Montant</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Pension animalière - {animal ? animal.name : 'Animal'}</td>
-              <td>{getDays()} jour(s)</td>
-              <td>{reservation ? reservation.daily_rate : '—'}€/jour</td>
-              <td>{invoice.amount.toFixed(2)}€</td>
-            </tr>
-          </tbody>
-        </table>
 
         <div className="invoice-summary">
           <div className="summary-row">
@@ -132,7 +194,7 @@ function InvoicePrint({ invoiceId, onClose }) {
             <span>{invoice.amount.toFixed(2)}€</span>
           </div>
           <div className="summary-row">
-            <span>TVA (20%) :</span>
+            <span>TVA :</span>
             <span>{invoice.tax.toFixed(2)}€</span>
           </div>
           <div className="summary-row total">
