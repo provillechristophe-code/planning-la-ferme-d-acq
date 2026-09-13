@@ -12,6 +12,76 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Flux iCalendar (.ics) pour synchronisation dynamique avec Google Calendar / Apple Calendar
+router.get('/calendar.ics', async (req, res) => {
+  try {
+    const reservations = await all(`
+      SELECT r.*, a.name as animal_name, a.species, c.name as client_name, c.phone as client_phone, b.box_number
+      FROM reservations r
+      LEFT JOIN animals a ON r.animal_id = a.id
+      LEFT JOIN clients c ON r.client_id = c.id
+      LEFT JOIN boxes b ON r.box_id = b.id
+      WHERE r.status != 'cancelled'
+    `);
+
+    let icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//La Ferme d Acq//Pension Animaliere//FR',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'X-WR-CALNAME:Pensions La Ferme d Acq'
+    ];
+
+    const formatICSDate = (dateStr) => {
+      if (!dateStr) return '';
+      const clean = dateStr.split('T')[0].replace(/-/g, '');
+      return clean;
+    };
+
+    reservations.forEach((r) => {
+      const animalName = r.animal_name || 'Animal';
+      const clientName = r.client_name || 'Client';
+      const clientPhone = r.client_phone ? ` - Tél: ${r.client_phone}` : '';
+      const boxName = r.box_number ? ` (Box ${r.box_number})` : '';
+
+      const checkInDate = formatICSDate(r.check_in);
+      const checkOutDate = formatICSDate(r.check_out);
+
+      if (checkInDate) {
+        icsContent.push('BEGIN:VEVENT');
+        icsContent.push(`UID:checkin-${r.id}@lafermedacq.com`);
+        icsContent.push(`DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`);
+        icsContent.push(`DTSTART;VALUE=DATE:${checkInDate}`);
+        icsContent.push(`DTEND;VALUE=DATE:${checkInDate}`);
+        icsContent.push(`SUMMARY:📥 Arrivée Pension : ${animalName}${boxName} (${clientName})`);
+        icsContent.push(`DESCRIPTION:Arrivée de ${animalName} pour le client ${clientName}${clientPhone}. Notes: ${r.notes || 'Aucune'}`);
+        icsContent.push('END:VEVENT');
+      }
+
+      if (checkOutDate) {
+        icsContent.push('BEGIN:VEVENT');
+        icsContent.push(`UID:checkout-${r.id}@lafermedacq.com`);
+        icsContent.push(`DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`);
+        icsContent.push(`DTSTART;VALUE=DATE:${checkOutDate}`);
+        icsContent.push(`DTEND;VALUE=DATE:${checkOutDate}`);
+        icsContent.push(`SUMMARY:📤 Départ Pension : ${animalName}${boxName} (${clientName})`);
+        icsContent.push(`DESCRIPTION:Départ de ${animalName} pour le client ${clientName}${clientPhone}. Notes: ${r.notes || 'Aucune'}`);
+        icsContent.push('END:VEVENT');
+      }
+    });
+
+    icsContent.push('END:VCALENDAR');
+
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename=la_ferme_d_acq_agenda.ics');
+    res.send(icsContent.join('\r\n'));
+  } catch (err) {
+    console.error('Erreur flux iCal :', err);
+    res.status(500).send('Erreur lors de la génération du calendrier.');
+  }
+});
+
 // Vérifier disponibilité d'un box
 router.get('/check-availability', async (req, res) => {
   try {
@@ -133,7 +203,6 @@ router.post('/restore-full', async (req, res) => {
     const { clients, animals, boxes, reservations, invoices, services, config } = req.body;
     var restoredCounts = { clients: 0, animals: 0, boxes: 0, reservations: 0, invoices: 0, services: 0 };
 
-    // Désactiver temporairement les contraintes de clés étrangères pendant la réinsertion
     try { await run('PRAGMA foreign_keys = OFF;'); } catch (e) {}
 
     if (clients && clients.length > 0) {
@@ -251,7 +320,6 @@ router.post('/restore-full', async (req, res) => {
       );
     }
 
-    // Réactiver les clés étrangères
     try { await run('PRAGMA foreign_keys = ON;'); } catch (e) {}
 
     res.json({ message: 'Restauration effectuée avec succès', counts: restoredCounts });

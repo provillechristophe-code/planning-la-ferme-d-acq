@@ -204,27 +204,39 @@ var styles = {
     marginBottom: 16
   }
 };
+
 function Dashboard() {
+  var d = new Date();
+  var yyyy = d.getFullYear();
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  var todayFormatted = yyyy + '-' + mm + '-' + dd;
+
+  var [selectedDate, setSelectedDate] = useState(todayFormatted);
   var [stats, setStats] = useState(null);
   var [loading, setLoading] = useState(true);
+
   useEffect(function() {
-    fetchStats();
-  }, []);
-  var fetchStats = function() {
-    axios.get('/api/stats').then(function(res) {
-      setStats(res.data);
-      setLoading(false);
-    }).catch(function(err) {
-      console.error(err);
-      setLoading(false);
-    });
-  };
+    var fetchStats = function(dateStr) {
+      axios.get('/api/stats?date=' + (dateStr || todayFormatted)).then(function(res) {
+        setStats(res.data);
+        setLoading(false);
+      }).catch(function(err) {
+        console.error(err);
+        setLoading(false);
+      });
+    };
+
+    fetchStats(selectedDate);
+  }, [selectedDate, todayFormatted]);
+
   var getValue = function(key) {
     if (stats && stats[key] !== undefined && stats[key] !== null) {
       return stats[key];
     }
     return 0;
   };
+
   var getRevenue = function() {
     if (stats && stats.totalRevenue) return stats.totalRevenue.toFixed(2);
     return '0.00';
@@ -262,12 +274,35 @@ function Dashboard() {
     return { padding: '4px 14px', borderRadius: 50, fontSize: 12, fontWeight: 600, display: 'inline-block', background: '#f1f5f9', color: '#64748b' };
   };
 
+  var displayDate = function(str) {
+    if (!str) return '';
+    var cleanStr = String(str).split('T')[0];
+    var parts = cleanStr.split('-');
+    if (parts.length !== 3) return String(str);
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
+  };
+
   var getStatusLabel = function(status) {
     if (status === 'confirmed') return 'Confirmée';
     if (status === 'pending') return 'En attente';
     if (status === 'cancelled') return 'Annulée';
     return status;
   };
+
+  // Générateur d'URL directe Google Calendar
+  var buildGoogleCalendarUrl = function(title, dateStr, details) {
+    if (!dateStr) return '#';
+    var cleanDate = dateStr.split('T')[0].replace(/-/g, '');
+    var startDateStr = cleanDate + 'T090000Z';
+    var endDateStr = cleanDate + 'T100000Z';
+    var baseUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+    baseUrl += '&text=' + encodeURIComponent(title);
+    baseUrl += '&dates=' + startDateStr + '/' + endDateStr;
+    baseUrl += '&details=' + encodeURIComponent(details || '');
+    baseUrl += '&location=' + encodeURIComponent("La Ferme d'Acq, Chaussée Brunehaut, 62144 Acq");
+    return baseUrl;
+  };
+
   if (loading) {
     return (
       <div style={styles.loading}>
@@ -277,12 +312,39 @@ function Dashboard() {
       </div>
     );
   }
+
   return (
     <div style={styles.page}>
-      <div>
-        <h2 style={styles.headerTitle}>Bienvenue ! 👋</h2>
-        <p style={styles.headerSub}>Voici un aperçu de votre pension aujourd'hui</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <h2 style={styles.headerTitle}>Bienvenue ! 👋</h2>
+          <p style={styles.headerSub}>Voici un aperçu de votre pension aujourd'hui</p>
+        </div>
+        <div>
+          <a
+            href="/api/reservations/calendar.ics"
+            download
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              background: '#ffffff',
+              color: '#4f46e5',
+              border: '2px solid #6366f1',
+              padding: '10px 18px',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 700,
+              textDecoration: 'none',
+              boxShadow: '0 2px 8px rgba(99,102,241,0.15)'
+            }}
+            title="Télécharger le fichier .ics pour synchroniser Google Calendar, Apple Calendar ou Outlook"
+          >
+            📅 Synchroniser Google Calendar (.ics)
+          </a>
+        </div>
       </div>
+
       <div style={styles.grid4}>
         <div style={styles.card}>
           <div style={styles.cardTop}>
@@ -313,7 +375,7 @@ function Dashboard() {
             <div style={styles.revenueIcon}>💰</div>
             <span style={styles.revenueBadge}>Revenu</span>
           </div>
-             <p style={styles.revenueLabel}>Revenu Total</p>
+          <p style={styles.revenueLabel}>Revenu Total</p>
           <p style={styles.revenueValue}>{getRevenue()}€</p>
           <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
@@ -327,77 +389,144 @@ function Dashboard() {
           </div>
         </div>
       </div>
+
       <div style={styles.tableCard}>
         <div style={styles.tableHeader}>
-          
-      {/* Arrivées et Départs du jour */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
-        {/* Arrivées */}
-        <div style={styles.card}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 20 }}>📥</span>
-            <div>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', margin: 0 }}>Arrivées aujourd'hui</h3>
-              <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>{getArrivals().length} arrivée(s)</p>
+          {/* Sélecteur de date pour Arrivées et Départs */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, background: '#ffffff', padding: '12px 20px', borderRadius: 14, border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 18 }}>📅</span>
+              <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 15 }}>Arrivées & Départs pour la date :</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button 
+                type="button" 
+                onClick={function() { setSelectedDate(todayFormatted); }}
+                style={{ padding: '6px 14px', borderRadius: 8, border: selectedDate === todayFormatted ? '2px solid #6366f1' : '1px solid #e2e8f0', background: selectedDate === todayFormatted ? '#eef2ff' : '#fff', color: selectedDate === todayFormatted ? '#6366f1' : '#64748b', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+              >
+                📍 Aujourd'hui
+              </button>
+              <input 
+                type="date" 
+                value={selectedDate} 
+                onChange={function(e) { setSelectedDate(e.target.value); }}
+                style={{ padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#1e293b', fontWeight: 600 }}
+              />
             </div>
           </div>
-          <div style={{ padding: 16 }}>
-            {getArrivals().length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#94a3b8', padding: 20, fontSize: 13 }}>Aucune arrivée prévue</p>
-            ) : (
-              getArrivals().map(function(r) {
-                var icon = (r.animal_species || '').toLowerCase() === 'chat' ? '🐱' : '🐶';
-                return (
-                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid #f8fafc' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{icon}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{r.animal_name || 'Animal'}</div>
-                      <div style={{ fontSize: 11, color: '#64748b' }}>👤 {r.client_name || 'Client'} {r.client_phone ? '• 📞 ' + r.client_phone : ''}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 11, color: '#10b981', fontWeight: 700 }}>📥 Arrivée</div>
-                      <div style={{ fontSize: 10, color: '#94a3b8' }}>{r.box_name ? '📦 ' + r.box_name : ''}</div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
 
-        {/* Départs */}
-        <div style={styles.card}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 20 }}>📤</span>
-            <div>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', margin: 0 }}>Départs aujourd'hui</h3>
-              <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>{getDepartures().length} départ(s)</p>
+          {/* Arrivées et Départs du jour */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
+            {/* Arrivées */}
+            <div style={styles.card}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 20 }}>📥</span>
+                <div>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', margin: 0 }}>Arrivées {selectedDate === todayFormatted ? "aujourd'hui" : `du ${selectedDate.split('-').reverse().join('/')}`}</h3>
+                  <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>{getArrivals().length} arrivée(s)</p>
+                </div>
+              </div>
+              <div style={{ padding: 16 }}>
+                {getArrivals().length === 0 ? (
+                  <p style={{ textAlign: 'center', color: '#94a3b8', padding: 20, fontSize: 13 }}>Aucune arrivée prévue</p>
+                ) : (
+                  getArrivals().map(function(r) {
+                    var icon = (r.animal_species || '').toLowerCase() === 'chat' ? '🐱' : '🐶';
+                    var gCalUrl = buildGoogleCalendarUrl(
+                      '📥 Arrivée Pension : ' + (r.animal_name || 'Animal') + ' (' + (r.client_name || 'Client') + ')',
+                      r.check_in,
+                      'Arrivée à la pension La Ferme d Acq. Client: ' + (r.client_name || '') + ' (Tél: ' + (r.client_phone || '') + ')'
+                    );
+                    return (
+                      <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid #f8fafc' }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 10, background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{icon}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{r.animal_name || 'Animal'}</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>👤 {r.client_name || 'Client'} {r.client_phone ? '• 📞 ' + r.client_phone : ''}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <a
+                            href={gCalUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'inline-block',
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: '#10b981',
+                              background: '#ecfdf5',
+                              padding: '4px 8px',
+                              borderRadius: 6,
+                              textDecoration: 'none'
+                            }}
+                            title="Ajouter cette alerte à votre Google Calendar"
+                          >
+                            📅 + Google Calendar
+                          </a>
+                          <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{r.box_name ? '📦 ' + r.box_name : ''}</div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Départs */}
+            <div style={styles.card}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 20 }}>📤</span>
+                <div>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', margin: 0 }}>Départs {selectedDate === todayFormatted ? "aujourd'hui" : `du ${selectedDate.split('-').reverse().join('/')}`}</h3>
+                  <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>{getDepartures().length} départ(s)</p>
+                </div>
+              </div>
+              <div style={{ padding: 16 }}>
+                {getDepartures().length === 0 ? (
+                  <p style={{ textAlign: 'center', color: '#94a3b8', padding: 20, fontSize: 13 }}>Aucun départ prévu</p>
+                ) : (
+                  getDepartures().map(function(r) {
+                    var icon = (r.animal_species || '').toLowerCase() === 'chat' ? '🐱' : '🐶';
+                    var gCalUrl = buildGoogleCalendarUrl(
+                      '📤 Départ Pension : ' + (r.animal_name || 'Animal') + ' (' + (r.client_name || 'Client') + ')',
+                      r.check_out,
+                      'Départ de la pension La Ferme d Acq. Client: ' + (r.client_name || '') + ' (Tél: ' + (r.client_phone || '') + ')'
+                    );
+                    return (
+                      <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid #f8fafc' }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 10, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{icon}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{r.animal_name || 'Animal'}</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>👤 {r.client_name || 'Client'} {r.client_phone ? '• 📞 ' + r.client_phone : ''}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <a
+                            href={gCalUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'inline-block',
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: '#d97706',
+                              background: '#fffbeb',
+                              padding: '4px 8px',
+                              borderRadius: 6,
+                              textDecoration: 'none'
+                            }}
+                            title="Ajouter cette alerte à votre Google Calendar"
+                          >
+                            📅 + Google Calendar
+                          </a>
+                          <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{r.box_name ? '📦 ' + r.box_name : ''}</div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           </div>
-          <div style={{ padding: 16 }}>
-            {getDepartures().length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#94a3b8', padding: 20, fontSize: 13 }}>Aucun départ prévu</p>
-            ) : (
-              getDepartures().map(function(r) {
-                var icon = (r.animal_species || '').toLowerCase() === 'chat' ? '🐱' : '🐶';
-                return (
-                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid #f8fafc' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{icon}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{r.animal_name || 'Animal'}</div>
-                      <div style={{ fontSize: 11, color: '#64748b' }}>👤 {r.client_name || 'Client'} {r.client_phone ? '• 📞 ' + r.client_phone : ''}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700 }}>📤 Départ</div>
-                      <div style={{ fontSize: 10, color: '#94a3b8' }}>{r.box_name ? '📦 ' + r.box_name : ''}</div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
           <h3 style={styles.tableTitle}>📋 Réservations Récentes</h3>
           <p style={styles.tableSub}>Les dernières réservations enregistrées</p>
         </div>
@@ -428,8 +557,8 @@ function Dashboard() {
                       </div>
                     </td>
                     <td>{r.client_name || ('Client #' + r.client_id)}</td>
-                    <td>{r.check_in}</td>
-                    <td>{r.check_out}</td>
+                    <td>{displayDate(r.check_in)}</td>
+                    <td>{displayDate(r.check_out)}</td>
                     <td>
                       <span style={getStatusStyle(r.status)}>
                         {getStatusLabel(r.status)}
@@ -465,4 +594,5 @@ function Dashboard() {
     </div>
   );
 }
+
 export default Dashboard;
