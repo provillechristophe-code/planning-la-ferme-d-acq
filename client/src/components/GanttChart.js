@@ -298,7 +298,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
     const conflict = hasConflict(newResForm.box_id, newResForm.check_in, newResForm.check_out);
     if (conflict) {
       showToast(`❌ Conflit : Box occupé par ${getAnimalName(conflict.animal_id)} du ${displayDate(conflict.check_in)} au ${displayDate(conflict.check_out)}`, 'error');
-      return;
+      return; 
     }
 
     const payload = {
@@ -510,8 +510,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
           )}
         </div>
       </div>
-
-      {/* ═══ VUE LISTE ═══ */}
+  {/* ═══ VUE LISTE ═══ */}
       {activeView === 'list' && (
         <div style={{ padding: 20 }}>
           {reservations.length === 0 ? (
@@ -525,7 +524,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                   <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Statut</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>🐾 Animal</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>👤 Client</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>👤 Client</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📦 Box</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📅 Arrivée</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📅 Départ</th>
@@ -983,7 +982,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 16 }}>{getAnimalSpecies(tooltip.reservation.animal_id) === 'chat' || getAnimalSpecies(tooltip.reservation.animal_id) === 'Chat' ? '🐱' : '🐶'}</span>
             <span style={{ fontWeight: 800, fontSize: 13 }}>{getAnimalName(tooltip.reservation.animal_id)}</span>
-            <span style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight 700, background: tooltip.reservation.status === 'confirmed' ? '#10b981' : tooltip.reservation.status === 'pending' ? '#ec4899' : '#64748b' }}>{getStatusLabel(tooltip.reservation.status)}</span>
+            <span style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: tooltip.reservation.status === 'confirmed' ? '#10b981' : tooltip.reservation.status === 'pending' ? '#ec4899' : '#64748b' }}>{getStatusLabel(tooltip.reservation.status)}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: '#cbd5e1' }}>
             <div>👤 <span style={{ color: '#fff', fontWeight: 600 }}>{getClientName(tooltip.reservation.client_id)}</span></div>
