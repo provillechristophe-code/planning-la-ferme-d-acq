@@ -55,7 +55,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
   const today = new Date();
   const todayStr = formatDate(today);
 
-  // Par défaut : charge les dates sauvegardées en mémoire, ou prend le 1er/dernier jour du mois
+  // Par defaut : charge les dates sauvegardees en memoire, ou prend le 1er/dernier jour du mois
   const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
@@ -77,7 +77,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
     localStorage.setItem('gantt_date_to', valeur);
   };
 
-  // ✅ CODE PROPRE ET SANS DOUBLONS
+  // CODE PROPRE ET SANS DOUBLONS
   const [popup, setPopup] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -93,7 +93,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
     status: 'confirmed'
   });
 
-  // États pour les nouveaux clients / animaux
+  // Etats pour les nouveaux clients / animaux
   const [isNewClient, setIsNewClient] = useState(false);
   const [isNewAnimal, setIsNewAnimal] = useState(false);
   const [newClientData, setNewClientData] = useState({ name: '', phone: '', email: '' });
@@ -117,7 +117,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
         setClients(r[2].data || []);
         setBoxes(r[3].data || []);
 
-        // Ajustement automatique des dates pour afficher uniquement les réservations en cours et à venir
+        // Ajustement automatique des dates pour afficher uniquement les reservations en cours et a venir
         const currentAndUpcomingRes = resList.filter(
           (res) => res.status !== 'cancelled' && res.check_out >= todayStr
         );
@@ -133,10 +133,10 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
             const minDate = checkIns[0];
             const maxDate = checkOuts[checkOuts.length - 1];
 
-            // Début : le plus tôt entre aujourd'hui et la plus ancienne réservation en cours/à venir
+            // Debut : le plus tot entre aujourd'hui et la plus ancienne reservation en cours/a venir
             const start = minDate < todayStr ? minDate : todayStr;
 
-            // Fin : au moins 30 jours après aujourd'hui ou la date de départ la plus éloignée
+            // Fin : au moins 30 jours apres aujourd'hui ou la date de depart la plus eloignee
             const defaultEnd = new Date(today);
             defaultEnd.setDate(defaultEnd.getDate() + 30);
             const defaultEndStr = formatDate(defaultEnd);
@@ -149,7 +149,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
             localStorage.setItem('gantt_date_to', end);
           }
         } else {
-          // Si aucune réservation en cours ou à venir, afficher à partir d'aujourd'hui sur 30 jours
+          // Si aucune reservation en cours ou a venir, afficher a partir d'aujourd'hui sur 30 jours
           const defaultEnd = new Date(today);
           defaultEnd.setDate(defaultEnd.getDate() + 30);
           const defaultEndStr = formatDate(defaultEnd);
@@ -165,7 +165,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
       .catch((err) => { console.error(err); setLoading(false); });
   };
 
-  const monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const monthNames = ['Janvier','F\u00e9vrier','Mars','Avril','Mai','Juin','Juillet','Ao\u00fbt','Septembre','Octobre','Novembre','D\u00e9cembre'];
   const dayLetters = ['D','L','M','M','J','V','S'];
 
   const currentViewDate = parseDate(dateFrom);
@@ -249,8 +249,8 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
   const getAnimalSpecies = (id) => { const a = animals.find((x) => x.id === id); return a?.species || ''; };
   const getClientName = (id) => { const c = clients.find((x) => x.id === id); return c?.name || `Client #${id}`; };
   const getBarColor = (r) => { if (r.status === 'confirmed') return '#10b981'; if (r.status === 'pending') return '#ec4899'; return '#94a3b8'; };
-  const getBoxStyle = (t) => { if (t === 'petit') return { icon: '🏠', bg: '#dbeafe' }; if (t === 'grand') return { icon: '🏰', bg: '#fef3c7' }; return { icon: '🏡', bg: '#d1fae5' }; };
-  const getStatusLabel = (st) => { if (st === 'confirmed') return '🟢 Habituel'; if (st === 'pending') return '🩷 Nouveau'; return '⚪ Annulé'; };
+  const getBoxStyle = (t) => { if (t === 'petit') return { icon: '\u1f3e0', bg: '#dbeafe' }; if (t === 'grand') return { icon: '\u1f3f0', bg: '#fef3c7' }; return { icon: '\u1f3e1', bg: '#d1fae5' }; };
+  const getStatusLabel = (st) => { if (st === 'confirmed') return '\u2611 Habitu\u00e9'; if (st === 'pending') return '\u2661 Nouveau'; return '\u25cb Annul\u00e9'; };
   const getDurationDays = (a, b) => { const d = Math.ceil((parseDate(b) - parseDate(a)) / 86400000); return d > 0 ? d : 0; };
   const getReservationTotal = (r) => (getDurationDays(r.check_in, r.check_out) * parseFloat(r.daily_rate || 0)).toFixed(2);
   const isWeekend = (d) => { const x = parseDate(d).getDay(); return x === 0 || x === 6; };
@@ -275,10 +275,10 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
   const closePopup = () => { setPopup(null); setEditMode(false); };
   const updateNewRes = (field, value) => setNewResForm((prev) => ({ ...prev, [field]: value }));
 
-  // ✅ CODE CORRIGÉ ET COMPATIBLE AXIOS
+  // CODE CORRIGE ET COMPATIBLE AXIOS
   const handleCreateReservation = () => {
     if (!isNewClient && !newResForm.client_id) { 
-      showToast('Veuillez sélectionner un client', 'error'); 
+      showToast('Veuillez s\u00e9lectionner un client', 'error'); 
       return; 
     }
     if (isNewClient && !newClientData.name.trim()) { 
@@ -287,7 +287,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
     }
 
     if (!isNewAnimal && !newResForm.animal_id) { 
-      showToast('Veuillez sélectionner un animal', 'error'); 
+      showToast('Veuillez s\u00e9lectionner un animal', 'error'); 
       return; 
     }
     if (isNewAnimal && !newAnimalData.name.trim()) { 
@@ -297,7 +297,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
 
     const conflict = hasConflict(newResForm.box_id, newResForm.check_in, newResForm.check_out);
     if (conflict) {
-      showToast(`❌ Conflit : Box occupé par ${getAnimalName(conflict.animal_id)} du ${displayDate(conflict.check_in)} au ${displayDate(conflict.check_out)}`, 'error');
+      showToast(`Conflit : Box occup\u00e9 par ${getAnimalName(conflict.animal_id)} du ${displayDate(conflict.check_in)} au ${displayDate(conflict.check_out)}`, 'error');
       return; 
     }
 
@@ -313,7 +313,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
       .then(() => { 
         closePopup(); 
         fetchData(); 
-        showToast('Réservation créée !'); 
+        showToast('R\u00e9servation cr\u00e9\u00e9e !'); 
 
         setIsNewClient(false);
         setIsNewAnimal(false);
@@ -340,17 +340,17 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
   const handleSaveEdit = () => {
     const conflict = hasConflict(editForm.box_id, editForm.check_in, editForm.check_out, popup.reservation.id);
     if (conflict) {
-      showToast(`❌ Conflit : Box occupé par ${getAnimalName(conflict.animal_id)} du ${displayDate(conflict.check_in)} au ${displayDate(conflict.check_out)}`, 'error');
+      showToast(`Conflit : Box occup\u00e9 par ${getAnimalName(conflict.animal_id)} du ${displayDate(conflict.check_in)} au ${displayDate(conflict.check_out)}`, 'error');
       return;
     }
     axios.put(`/api/reservations/${popup.reservation.id}`, editForm)
-      .then(() => { closePopup(); fetchData(); showToast('Réservation modifiée !'); })
+      .then(() => { closePopup(); fetchData(); showToast('R\u00e9servation modifi\u00e9e !'); })
       .catch((err) => { showToast(`Erreur: ${err.response?.data?.error || 'Erreur'}`, 'error'); });
   };
 
   const handleDeleteReservation = (id) => {
     axios.delete(`/api/reservations/${id}`)
-      .then(() => { closePopup(); fetchData(); showToast('Réservation supprimée !'); });
+      .then(() => { closePopup(); fetchData(); showToast('R\u00e9servation supprim\u00e9e !'); });
   };
 
   const dates = generateDateRange();
@@ -381,7 +381,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
   const liveConflictEdit = popup?.type === 'details' && editMode ? hasConflict(editForm.box_id, editForm.check_in, editForm.check_out, popup.reservation.id) : null;
 
   if (loading) return <div style={{ padding: 40 }}>Chargement...</div>;
-  if (boxes.length === 0) return <div style={{ padding: 40, textAlign: 'center' }}>📦 Aucun box configuré</div>;
+  if (boxes.length === 0) return <div style={{ padding: 40, textAlign: 'center' }}>Aucun box configur\u00e9</div>;
 
   const arrowBtnStyle = {
     width: 30, height: 30, borderRadius: 8, border: '1px solid #e2e8f0',
@@ -424,47 +424,47 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
     <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* ═══ BARRE UNIQUE COMPACTE ═══ */}
+      {/* BARRE UNIQUE COMPACTE */}
       <div style={{ padding: '12px 18px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: '#fafbfc' }}>
 
         {/* Titre */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 8 }}>
-          <span style={{ fontSize: 18 }}>📊</span>
-          <span style={{ fontSize: 15, fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap' }}>Planning de réservation</span>
+          <span style={{ fontSize: 18 }}>{'\u1f4ca'}</span>
+          <span style={{ fontSize: 15, fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap' }}>Planning de r\u00e9servation</span>
         </div>
 
-        {/* Séparateur */}
+        {/* Separateur */}
         <div style={{ borderLeft: '1px solid #e2e8f0', height: 24 }}></div>
 
-        {/* ══ BOUTONS VUE CORRIGÉS ══ */}
+        {/* BOUTONS VUE CORRIGES */}
         <div style={{ display: 'flex', gap: 4 }}>
           <button
             style={viewBtnStyle(activeView === 'list')}
             onClick={() => handleViewChange('list')}
           >
-            📋 Liste
+            Liste
           </button>
           <button
             style={viewBtnStyle(activeView === 'gantt')}
             onClick={() => handleViewChange('gantt')}
           >
-            📊 Planning
+            Planning
           </button>
         </div>
 
-        {/* Séparateur */}
+        {/* Separateur */}
         <div style={{ borderLeft: '1px solid #e2e8f0', height: 24 }}></div>
 
         {/* Navigateur mois */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: '#f1f5f9', borderRadius: 8, padding: '2px 4px' }}>
-          <button onClick={goPrevMonth} style={arrowBtnStyle} title="Mois précédent">◀</button>
+          <button onClick={goPrevMonth} style={arrowBtnStyle} title="Mois pr\u00e9c\u00e9dent">\u25c0</button>
           <button onClick={goThisMonth} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 12, color: '#1e293b', minWidth: 120, textAlign: 'center', whiteSpace: 'nowrap' }} title="Mois en cours">{currentMonthLabel}</button>
-          <button onClick={goNextMonth} style={arrowBtnStyle} title="Mois suivant">▶</button>
+          <button onClick={goNextMonth} style={arrowBtnStyle} title="Mois suivant">\u25b6</button>
         </div>
 
         {/* Recherche */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 10px' }}>
-          <span style={{ fontSize: 12 }}>🔍</span>
+          <span style={{ fontSize: 12 }}>{'\u1f50d'}</span>
           <input
             type="text"
             placeholder="Animal, client, box..."
@@ -473,12 +473,12 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
             style={{ border: 'none', outline: 'none', fontSize: 12, width: 160, background: 'transparent' }}
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')} style={{ background: '#f1f5f9', border: 'none', borderRadius: 6, width: 18, height: 18, cursor: 'pointer', fontSize: 10 }}>✕</button>
+            <button onClick={() => setSearchQuery('')} style={{ background: '#f1f5f9', border: 'none', borderRadius: 6, width: 18, height: 18, cursor: 'pointer', fontSize: 10 }}>\u2715</button>
           )}
         </div>
         {searchQuery && <span style={{ fontSize: 11, color: '#6366f1', fontWeight: 700 }}>{filteredBoxes.length}/{boxes.length} box</span>}
 
-        {/* Séparateur */}
+        {/* Separateur */}
         <div style={{ borderLeft: '1px solid #e2e8f0', height: 24 }}></div>
 
         {/* Dates manuelles */}
@@ -492,15 +492,15 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
         {/* Spacer */}
         <div style={{ flex: 1 }}></div>
 
-        {/* Légende mini */}
+        {/* Legende mini */}
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setShowLegend(!showLegend)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap' }}>🎨 Légende</button>
+          <button onClick={() => setShowLegend(!showLegend)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap' }}>L\u00e9gende</button>
           {showLegend && (
             <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 8px 30px rgba(0,0,0,0.12)', padding: 14, zIndex: 100, minWidth: 180 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 12, height: 12, borderRadius: 3, background: '#10b981' }}></div><span style={{ fontSize: 12, fontWeight: 600, color: '#10b981' }}>Habitué</span></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 12, height: 12, borderRadius: 3, background: '#10b981' }}></div><span style={{ fontSize: 12, fontWeight: 600, color: '#10b981' }}>Habitu\u00e9</span></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 12, height: 12, borderRadius: 3, background: '#ec4899' }}></div><span style={{ fontSize: 12, fontWeight: 600, color: '#ec4899' }}>Nouveau</span></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 12, height: 12, borderRadius: 3, background: '#94a3b8' }}></div><span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8' }}>Annulé</span></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 12, height: 12, borderRadius: 3, background: '#94a3b8' }}></div><span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8' }}>Annul\u00e9</span></div>
                 <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 6 }}></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 12, height: 12, borderRadius: 3, background: '#1e40af' }}></div><span style={{ fontSize: 12, fontWeight: 700, color: '#1e40af' }}>Aujourd'hui</span></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 12, height: 12, borderRadius: 3, background: '#fee2e2', border: '1px solid #fca5a5' }}></div><span style={{ fontSize: 12, fontWeight: 600, color: '#dc2626' }}>Samedi</span></div>
@@ -510,26 +510,27 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
           )}
         </div>
       </div>
-  {/* ═══ VUE LISTE ═══ */}
+
+      {/* VUE LISTE */}
       {activeView === 'list' && (
         <div style={{ padding: 20 }}>
           {reservations.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
-              <span style={{ fontSize: 40 }}>📭</span>
-              <p style={{ marginTop: 12, fontWeight: 600 }}>Aucune réservation trouvée</p>
+              <span style={{ fontSize: 40 }}>{'\u1f4ec'}</span>
+              <p style={{ marginTop: 12, fontWeight: 600 }}>Aucune r\u00e9servation trouv\u00e9e</p>
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                   <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Statut</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>🐾 Animal</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>👤 Client</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📦 Box</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📅 Arrivée</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📅 Départ</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>⏱ Durée</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>💰 Total</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Animal</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Client</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Box</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Arriv\u00e9e</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>D\u00e9part</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Dur\u00e9e</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Total</th>
                   <th style={{ padding: '12px 14px', textAlign: 'center', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Actions</th>
                 </tr>
               </thead>
@@ -551,12 +552,12 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                   .sort((a, b) => a.check_in > b.check_in ? 1 : -1)
                   .map((res) => {
                     const sp = getAnimalSpecies(res.animal_id);
-                    const icon = sp === 'chat' || sp === 'Chat' ? '🐱' : '🐶';
+                    const icon = sp === 'chat' || sp === 'Chat' ? '\u1f431' : '\u1f436';
                     const box = boxes.find((b) => b.id === res.box_id);
                     const statusColors = {
-                      confirmed: { bg: '#ecfdf5', color: '#059669', label: '🟢 Habitué' },
-                      pending: { bg: '#fdf2f8', color: '#ec4899', label: '🩷 Nouveau' },
-                      cancelled: { bg: '#f1f5f9', color: '#94a3b8', label: '⚪ Annulé' }
+                      confirmed: { bg: '#ecfdf5', color: '#059669', label: 'Habitu\u00e9' },
+                      pending: { bg: '#fdf2f8', color: '#ec4899', label: 'Nouveau' },
+                      cancelled: { bg: '#f1f5f9', color: '#94a3b8', label: 'Annul\u00e9' }
                     };
                     const st = statusColors[res.status] || statusColors.cancelled;
 
@@ -574,10 +575,10 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                         <td style={{ padding: '10px 14px', fontWeight: 600, color: '#1e293b' }}>{displayDate(res.check_in)}</td>
                         <td style={{ padding: '10px 14px', fontWeight: 600, color: '#1e293b' }}>{displayDate(res.check_out)}</td>
                         <td style={{ padding: '10px 14px', color: '#6366f1', fontWeight: 700 }}>{getDurationDays(res.check_in, res.check_out)}j</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 800, color: '#059669' }}>{getReservationTotal(res)}€</td>
+                        <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 800, color: '#059669' }}>{getReservationTotal(res)}\u20ac</td>
                         <td style={{ padding: '10px 14px', textAlign: 'center' }}>
                           <button onClick={() => openReservationDetails(res)} style={{ background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#6366f1' }}>
-                            👁 Voir
+                            Voir
                           </button>
                         </td>
                       </tr>
@@ -589,11 +590,11 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
         </div>
       )}
 
-      {/* ═══ GRILLE GANTT ═══ */}
+      {/* GRILLE GANTT */}
       {activeView === 'gantt' && <div style={{ display: 'flex' }}>
         {/* Colonne gauche - Box */}
         <div style={{ width: 160, flexShrink: 0, background: '#fafbfc', borderRight: '2px solid #e2e8f0', zIndex: 2 }}>
-          <div style={{ height: 72, borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📦 Box {searchQuery ? `(${filteredBoxes.length})` : ''}</div>
+          <div style={{ height: 72, borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Box {searchQuery ? `(${filteredBoxes.length})` : ''}</div>
           {filteredBoxes.map((box) => {
             const bs = getBoxStyle(box.box_type);
             const countRes = reservations.filter((r) => String(r.box_id) === String(box.id) && r.status !== 'cancelled' && r.check_out >= todayStr && r.check_in <= dateTo).length;
@@ -602,12 +603,12 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                 <span style={{ width: 26, height: 26, borderRadius: 7, background: bs.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>{bs.icon}</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 11, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 4 }}>{box.box_number} {countRes > 0 && <span style={{ background: '#eef2ff', color: '#6366f1', borderRadius: 10, padding: '0 5px', fontSize: 9 }}>{countRes}</span>}</div>
-                  <div style={{ fontSize: 9, color: '#94a3b8' }}>{box.box_type} • {box.daily_rate}€</div>
+                  <div style={{ fontSize: 9, color: '#94a3b8' }}>{box.box_type} • {box.daily_rate}\u20ac</div>
                 </div>
               </div>
             );
           })}
-          {filteredBoxes.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 11 }}>Aucun box trouvé pour "{searchQuery}"</div>}
+          {filteredBoxes.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 11 }}>Aucun box trouv\u00e9 pour "{searchQuery}"</div>}
         </div>
 
         {/* Colonne droite - Calendrier */}
@@ -616,7 +617,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
             {/* Ligne aujourd'hui verticale */}
             {todayIndex >= 0 && (
               <div style={{ position: 'absolute', left: todayIndex * colWidth + colWidth / 2, top: 0, bottom: 0, width: 2, background: 'linear-gradient(180deg, #6366f1, transparent)', zIndex: 15, pointerEvents: 'none' }}>
-                <div style={{ position: 'sticky', top: 0, background: '#6366f1', color: 'white', fontSize: 8, fontWeight: 800, padding: '3px 6px', borderRadius: '0 0 6px 6px', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(99,102,241,0.4)' }}>📍 AUJ</div>
+                <div style={{ position: 'sticky', top: 0, background: '#6366f1', color: 'white', fontSize: 8, fontWeight: 800, padding: '3px 6px', borderRadius: '0 0 6px 6px', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(99,102,241,0.4)' }}>AUJ</div>
               </div>
             )}
             {/* Header Mois */}
@@ -664,7 +665,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                         background: td ? '#dbeafe' : we ? getWeekendCellBg(date) : '#fff',
                         borderLeft: td ? '3px solid #1e40af' : 'none',
                         cursor: occ ? 'default' : 'pointer'
-                      }} title={occ ? '' : `Réserver le ${displayDate(date)}`}></div>
+                      }} title={occ ? '' : `R\u00e9server le ${displayDate(date)}`}></div>
                     );
                   })}
                   {br.map((res) => {
@@ -681,7 +682,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                     const pos = calculatePosition(res.check_in, res.check_out, dates);
                     if (pos.dayStart >= totalDays || pos.dayStart + pos.width < 0) return null;
                     const sp = getAnimalSpecies(res.animal_id);
-                    const icon = sp === 'chat' || sp === 'Chat' ? '🐱' : '🐶';
+                    const icon = sp === 'chat' || sp === 'Chat' ? '\u1f431' : '\u1f436';
                     return (
                       <div key={res.id}
                         onClick={() => openReservationDetails(res)}
@@ -715,16 +716,16 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
         </div>
       </div>}
 
-      {/* ═══ POPUPS ═══ */}
+      {/* POPUPS */}
       {popup && popup.type === 'new' && (
         <div style={ss.overlay} onClick={closePopup}>
           <div style={ss.modal} onClick={(e) => e.stopPropagation()}>
             <div style={ss.modalHeader}>
               <div>
-                <h3 style={ss.modalTitle}>📋 Nouvelle réservation</h3>
+                <h3 style={ss.modalTitle}>Nouvelle r\u00e9servation</h3>
                 <p style={ss.modalSub}>Box {popup.box.box_number} • {displayDate(popup.date)}</p>
               </div>
-              <button style={ss.modalClose} onClick={closePopup}>✕</button>
+              <button style={ss.modalClose} onClick={closePopup}>\u2715</button>
             </div>
             <div style={ss.modalBody}>
 
@@ -738,7 +739,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                       onChange={(e) => setIsNewClient(e.target.checked)} 
                       style={{ marginRight: 4 }}
                     />
-                    ➕ Nouveau client
+                    Nouveau client
                   </label>
                 </div>
 
@@ -763,7 +764,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                     <input 
                       style={ss.input} 
                       type="text" 
-                      placeholder="Téléphone" 
+                      placeholder="T\u00e9l\u00e9phone" 
                       value={newClientData.phone} 
                       onChange={(e) => setNewClientData({ ...newClientData, phone: e.target.value })} 
                     />
@@ -788,7 +789,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                       onChange={(e) => setIsNewAnimal(e.target.checked)} 
                       style={{ marginRight: 4 }}
                     />
-                    ➕ Nouvel animal
+                    Nouvel animal
                   </label>
                 </div>
 
@@ -816,8 +817,8 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                         value={newAnimalData.species} 
                         onChange={(e) => setNewAnimalData({ ...newAnimalData, species: e.target.value })}
                       >
-                        <option value="Chien">🐶 Chien</option>
-                        <option value="Chat">🐱 Chat</option>
+                        <option value="Chien">Chien</option>
+                        <option value="Chat">Chat</option>
                       </select>
                       <input 
                         style={ss.input} 
@@ -833,37 +834,37 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
 
               <div style={ss.grid2}>
                 <div style={ss.formGroup}>
-                  <label style={ss.label}>📅 Arrivée</label>
+                  <label style={ss.label}>Arriv\u00e9e</label>
                   <input style={ss.input} type="date" value={newResForm.check_in} onChange={(e) => updateNewRes('check_in', e.target.value)} />
                 </div>
                 <div style={ss.formGroup}>
-                  <label style={ss.label}>📅 Départ</label>
+                  <label style={ss.label}>D\u00e9part</label>
                   <input style={ss.input} type="date" value={newResForm.check_out} onChange={(e) => updateNewRes('check_out', e.target.value)} />
                 </div>
               </div>
               <div style={ss.formGroup}>
-                <label style={ss.label}>💶 Tarif/jour (€)</label>
+                <label style={ss.label}>Tarif/jour (\u20ac)</label>
                 <input style={ss.input} type="number" step="0.01" value={newResForm.daily_rate} onChange={(e) => updateNewRes('daily_rate', e.target.value)} />
               </div>
               {liveConflictNew && (
                 <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: 18 }}>❌</span>
+                  <span style={{ fontSize: 18 }}>\u274c</span>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>Conflit détecté !</div>
-                    <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 2 }}>Box occupé par <b>{getAnimalName(liveConflictNew.animal_id)}</b> ({getClientName(liveConflictNew.client_id)}) du {displayDate(liveConflictNew.check_in)} au {displayDate(liveConflictNew.check_out)}</div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>Conflit d\u00e9tect\u00e9 !</div>
+                    <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 2 }}>Box occup\u00e9 par <b>{getAnimalName(liveConflictNew.animal_id)}</b> ({getClientName(liveConflictNew.client_id)}) du {displayDate(liveConflictNew.check_in)} au {displayDate(liveConflictNew.check_out)}</div>
                   </div>
                 </div>
               )}
               <div style={ss.formGroup}>
-                <label style={ss.label}>📝 Notes</label>
+                <label style={ss.label}>Notes</label>
                 <input style={ss.input} value={newResForm.notes} onChange={(e) => updateNewRes('notes', e.target.value)} placeholder="Optionnel..." />
               </div>
               <div style={ss.formGroup}>
-                <label style={ss.label}>📋 Type de client</label>
+                <label style={ss.label}>Type de client</label>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button type="button" onClick={() => updateNewRes('status', 'confirmed')} style={{ flex: 1, padding: '12px 8px', borderRadius: 10, border: (newResForm.status || 'confirmed') === 'confirmed' ? '3px solid #059669' : '1px solid #e2e8f0', background: (newResForm.status || 'confirmed') === 'confirmed' ? '#ecfdf5' : '#fff', cursor: 'pointer', textAlign: 'center' }}>
                     <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#10b981', margin: '0 auto 6px auto' }}></div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981' }}>Habitué</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981' }}>Habitu\u00e9</div>
                   </button>
                   <button type="button" onClick={() => updateNewRes('status', 'pending')} style={{ flex: 1, padding: '12px 8px', borderRadius: 10, border: newResForm.status === 'pending' ? '3px solid #ec4899' : '1px solid #e2e8f0', background: newResForm.status === 'pending' ? '#fdf2f8' : '#fff', cursor: 'pointer', textAlign: 'center' }}>
                     <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#ec4899', margin: '0 auto 6px auto' }}></div>
@@ -871,7 +872,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                   </button>
                 </div>
               </div>
-              <button style={ss.btnCreate} onClick={handleCreateReservation}>📋 Créer la réservation</button>
+              <button style={ss.btnCreate} onClick={handleCreateReservation}>Cr\u00e9er la r\u00e9servation</button>
               <button style={ss.btnCancel} onClick={closePopup}>Annuler</button>
             </div>
           </div>
@@ -883,10 +884,10 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
           <div style={ss.modal} onClick={(e) => e.stopPropagation()}>
             <div style={ss.modalHeader}>
               <div>
-                <h3 style={ss.modalTitle}>📋 Détails</h3>
+                <h3 style={ss.modalTitle}>D\u00e9tails</h3>
                 <p style={ss.modalSub}>#{popup.reservation.id}</p>
               </div>
-              <button style={ss.modalClose} onClick={closePopup}>✕</button>
+              <button style={ss.modalClose} onClick={closePopup}>\u2715</button>
             </div>
             <div style={ss.modalBody}>
               <div style={{ textAlign: 'center', marginBottom: 20 }}>
@@ -896,29 +897,29 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                   color: popup.reservation.status === 'cancelled' ? '#94a3b8' : popup.reservation.status === 'pending' ? '#ec4899' : '#10b981'
                 }}>{getStatusLabel(popup.reservation.status)}</span>
               </div>
-              <div style={ss.detailRow}><span style={ss.detailLabel}>🐾 Animal</span><span style={ss.detailValue}>{getAnimalName(popup.reservation.animal_id)}</span></div>
-              <div style={ss.detailRow}><span style={ss.detailLabel}>👤 Client</span><span style={ss.detailValue}>{getClientName(popup.reservation.client_id)}</span></div>
-              <div style={ss.detailRow}><span style={ss.detailLabel}>📅 Arrivée</span><span style={ss.detailValue}>{displayDate(popup.reservation.check_in)}</span></div>
-              <div style={ss.detailRow}><span style={ss.detailLabel}>📅 Départ</span><span style={ss.detailValue}>{displayDate(popup.reservation.check_out)}</span></div>
-              <div style={ss.detailRow}><span style={ss.detailLabel}>📅 Durée</span><span style={ss.detailValue}>{getDurationDays(popup.reservation.check_in, popup.reservation.check_out)} jour(s)</span></div>
-              <div style={ss.detailRow}><span style={ss.detailLabel}>💶 Tarif</span><span style={ss.detailValue}>{popup.reservation.daily_rate}€/j</span></div>
-              <div style={ss.detailRow}><span style={ss.detailLabel}>💰 Total</span><span style={{ ...ss.detailValue, color: '#059669', fontSize: 16 }}>{getReservationTotal(popup.reservation)}€</span></div>
-              {popup.reservation.notes && <div style={ss.detailRow}><span style={ss.detailLabel}>📝 Notes</span><span style={ss.detailValue}>{popup.reservation.notes}</span></div>}
+              <div style={ss.detailRow}><span style={ss.detailLabel}>Animal</span><span style={ss.detailValue}>{getAnimalName(popup.reservation.animal_id)}</span></div>
+              <div style={ss.detailRow}><span style={ss.detailLabel}>Client</span><span style={ss.detailValue}>{getClientName(popup.reservation.client_id)}</span></div>
+              <div style={ss.detailRow}><span style={ss.detailLabel}>Arriv\u00e9e</span><span style={ss.detailValue}>{displayDate(popup.reservation.check_in)}</span></div>
+              <div style={ss.detailRow}><span style={ss.detailLabel}>D\u00e9part</span><span style={ss.detailValue}>{displayDate(popup.reservation.check_out)}</span></div>
+              <div style={ss.detailRow}><span style={ss.detailLabel}>Dur\u00e9e</span><span style={ss.detailValue}>{getDurationDays(popup.reservation.check_in, popup.reservation.check_out)} jour(s)</span></div>
+              <div style={ss.detailRow}><span style={ss.detailLabel}>Tarif</span><span style={ss.detailValue}>{popup.reservation.daily_rate}\u20ac/j</span></div>
+              <div style={ss.detailRow}><span style={ss.detailLabel}>Total</span><span style={{ ...ss.detailValue, color: '#059669', fontSize: 16 }}>{getReservationTotal(popup.reservation)}\u20ac</span></div>
+              {popup.reservation.notes && <div style={ss.detailRow}><span style={ss.detailLabel}>Notes</span><span style={ss.detailValue}>{popup.reservation.notes}</span></div>}
 
               {!editMode ? (
                 <div>
-                  <button style={ss.btnCreate} onClick={() => startEdit(popup.reservation)}>✏️ Modifier</button>
-                  <button style={ss.btnDelete} onClick={() => handleDeleteReservation(popup.reservation.id)}>🗑️ Supprimer</button>
+                  <button style={ss.btnCreate} onClick={() => startEdit(popup.reservation)}>Modifier</button>
+                  <button style={ss.btnDelete} onClick={() => handleDeleteReservation(popup.reservation.id)}>Supprimer</button>
                   <button style={ss.btnCancel} onClick={closePopup}>Fermer</button>
                 </div>
               ) : (
                 <div>
                   <div style={ss.formGroup}>
-                    <label style={ss.label}>📋 Statut</label>
+                    <label style={ss.label}>Statut</label>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button type="button" onClick={() => updateEditForm('status', 'confirmed')} style={{ flex: 1, padding: '10px 6px', borderRadius: 10, border: editForm.status === 'confirmed' ? '3px solid #059669' : '1px solid #e2e8f0', background: editForm.status === 'confirmed' ? '#ecfdf5' : '#fff', cursor: 'pointer', textAlign: 'center' }}>
                         <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#10b981', margin: '0 auto 4px auto' }}></div>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#10b981' }}>Habitué</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#10b981' }}>Habitu\u00e9</div>
                       </button>
                       <button type="button" onClick={() => updateEditForm('status', 'pending')} style={{ flex: 1, padding: '10px 6px', borderRadius: 10, border: editForm.status === 'pending' ? '3px solid #ec4899' : '1px solid #e2e8f0', background: editForm.status === 'pending' ? '#fdf2f8' : '#fff', cursor: 'pointer', textAlign: 'center' }}>
                         <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#ec4899', margin: '0 auto 4px auto' }}></div>
@@ -926,33 +927,33 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                       </button>
                       <button type="button" onClick={() => updateEditForm('status', 'cancelled')} style={{ flex: 1, padding: '10px 6px', borderRadius: 10, border: editForm.status === 'cancelled' ? '3px solid #94a3b8' : '1px solid #e2e8f0', background: editForm.status === 'cancelled' ? '#f1f5f9' : '#fff', cursor: 'pointer', textAlign: 'center' }}>
                         <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#94a3b8', margin: '0 auto 4px auto' }}></div>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8' }}>Annulé</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8' }}>Annul\u00e9</div>
                       </button>
                     </div>
                   </div>
                   {liveConflictEdit && (
                     <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: 18 }}>❌</span>
+                      <span style={{ fontSize: 18 }}>\u274c</span>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>Conflit détecté !</div>
-                        <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 2 }}>Box occupé par <b>{getAnimalName(liveConflictEdit.animal_id)}</b> du {displayDate(liveConflictEdit.check_in)} au {displayDate(liveConflictEdit.check_out)}</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>Conflit d\u00e9tect\u00e9 !</div>
+                        <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 2 }}>Box occup\u00e9 par <b>{getAnimalName(liveConflictEdit.animal_id)}</b> du {displayDate(liveConflictEdit.check_in)} au {displayDate(liveConflictEdit.check_out)}</div>
                       </div>
                     </div>
                   )}
                   <div style={ss.grid2}>
-                    <div style={ss.formGroup}><label style={ss.label}>📅 Arrivée</label><input style={ss.input} type="date" value={editForm.check_in} onChange={(e) => updateEditForm('check_in', e.target.value)} /></div>
-                    <div style={ss.formGroup}><label style={ss.label}>📅 Départ</label><input style={ss.input} type="date" value={editForm.check_out} onChange={(e) => updateEditForm('check_out', e.target.value)} /></div>
+                    <div style={ss.formGroup}><label style={ss.label}>Arriv\u00e9e</label><input style={ss.input} type="date" value={editForm.check_in} onChange={(e) => updateEditForm('check_in', e.target.value)} /></div>
+                    <div style={ss.formGroup}><label style={ss.label}>D\u00e9part</label><input style={ss.input} type="date" value={editForm.check_out} onChange={(e) => updateEditForm('check_out', e.target.value)} /></div>
                   </div>
                   <div style={ss.formGroup}>
-                    <label style={ss.label}>📦 Box</label>
+                    <label style={ss.label}>Box</label>
                     <select style={ss.select} value={editForm.box_id} onChange={(e) => updateEditForm('box_id', e.target.value)}>
                       <option value="">-- Sans box --</option>
-                      {boxes.map((b) => <option key={b.id} value={b.id}>{b.box_number} ({b.daily_rate}€/j)</option>)}
+                      {boxes.map((b) => <option key={b.id} value={b.id}>{b.box_number} ({b.daily_rate}\u20ac/j)</option>)}
                     </select>
                   </div>
-                  <div style={ss.formGroup}><label style={ss.label}>💶 Tarif/jour</label><input style={ss.input} type="number" step="0.01" value={editForm.daily_rate} onChange={(e) => updateEditForm('daily_rate', e.target.value)} /></div>
-                  <div style={ss.formGroup}><label style={ss.label}>📝 Notes</label><input style={ss.input} value={editForm.notes} onChange={(e) => updateEditForm('notes', e.target.value)} /></div>
-                  <button style={ss.btnCreate} onClick={handleSaveEdit}>💾 Enregistrer</button>
+                  <div style={ss.formGroup}><label style={ss.label}>Tarif/jour</label><input style={ss.input} type="number" step="0.01" value={editForm.daily_rate} onChange={(e) => updateEditForm('daily_rate', e.target.value)} /></div>
+                  <div style={ss.formGroup}><label style={ss.label}>Notes</label><input style={ss.input} value={editForm.notes} onChange={(e) => updateEditForm('notes', e.target.value)} /></div>
+                  <button style={ss.btnCreate} onClick={handleSaveEdit}>Enregistrer</button>
                   <button style={ss.btnCancel} onClick={() => setEditMode(false)}>Annuler</button>
                 </div>
               )}
@@ -980,16 +981,16 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
           border: '1px solid #334155'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <span style={{ fontSize: 16 }}>{getAnimalSpecies(tooltip.reservation.animal_id) === 'chat' || getAnimalSpecies(tooltip.reservation.animal_id) === 'Chat' ? '🐱' : '🐶'}</span>
+            <span style={{ fontSize: 16 }}>{getAnimalSpecies(tooltip.reservation.animal_id) === 'chat' || getAnimalSpecies(tooltip.reservation.animal_id) === 'Chat' ? '\u1f431' : '\u1f436'}</span>
             <span style={{ fontWeight: 800, fontSize: 13 }}>{getAnimalName(tooltip.reservation.animal_id)}</span>
             <span style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: tooltip.reservation.status === 'confirmed' ? '#10b981' : tooltip.reservation.status === 'pending' ? '#ec4899' : '#64748b' }}>{getStatusLabel(tooltip.reservation.status)}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: '#cbd5e1' }}>
-            <div>👤 <span style={{ color: '#fff', fontWeight: 600 }}>{getClientName(tooltip.reservation.client_id)}</span></div>
-            <div>📦 Box {boxes.find((b) => String(b.id) === String(tooltip.reservation.box_id))?.box_number || tooltip.reservation.box_id}</div>
-            <div>📅 {displayDate(tooltip.reservation.check_in)} → {displayDate(tooltip.reservation.check_out)} ({getDurationDays(tooltip.reservation.check_in, tooltip.reservation.check_out)}j)</div>
-            <div>💶 {tooltip.reservation.daily_rate}€/j • <span style={{ color: '#4ade80', fontWeight: 800 }}>{getReservationTotal(tooltip.reservation)}€</span></div>
-            {tooltip.reservation.notes && <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #334155', color: '#94a3b8', fontStyle: 'italic' }}>📝 {tooltip.reservation.notes}</div>}
+            <div>Client: <span style={{ color: '#fff', fontWeight: 600 }}>{getClientName(tooltip.reservation.client_id)}</span></div>
+            <div>Box {boxes.find((b) => String(b.id) === String(tooltip.reservation.box_id))?.box_number || tooltip.reservation.box_id}</div>
+            <div>{displayDate(tooltip.reservation.check_in)} \u2192 {displayDate(tooltip.reservation.check_out)} ({getDurationDays(tooltip.reservation.check_in, tooltip.reservation.check_out)}j)</div>
+            <div>{tooltip.reservation.daily_rate}\u20ac/j • <span style={{ color: '#4ade80', fontWeight: 800 }}>{getReservationTotal(tooltip.reservation)}\u20ac</span></div>
+            {tooltip.reservation.notes && <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #334155', color: '#94a3b8', fontStyle: 'italic' }}>Notes: {tooltip.reservation.notes}</div>}
           </div>
         </div>
       )}
