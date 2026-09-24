@@ -77,7 +77,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
     localStorage.setItem('gantt_date_to', valeur);
   };
 
-// ✅ CODE PROPRE ET SANS DOUBLONS
+  // ✅ CODE PROPRE ET SANS DOUBLONS
   const [popup, setPopup] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -111,10 +111,33 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
       axios.get('/api/config/boxes')
     ])
       .then((r) => {
-        setReservations(r[0].data);
-        setAnimals(r[1].data);
-        setClients(r[2].data);
-        setBoxes(r[3].data);
+        const resList = r[0].data || [];
+        setReservations(resList);
+        setAnimals(r[1].data || []);
+        setClients(r[2].data || []);
+        setBoxes(r[3].data || []);
+
+        // Ajustement automatique des dates de début et fin si des réservations existent
+        const activeRes = resList.filter((res) => res.status !== 'cancelled');
+        if (activeRes.length > 0) {
+          const checkIns = activeRes.map((res) => res.check_in).filter(Boolean);
+          const checkOuts = activeRes.map((res) => res.check_out).filter(Boolean);
+          if (checkIns.length > 0 && checkOuts.length > 0) {
+            checkIns.sort();
+            checkOuts.sort();
+            const minDate = checkIns[0];
+            const maxDate = checkOuts[checkOuts.length - 1];
+            
+            const start = minDate < todayStr ? minDate : todayStr;
+            const end = maxDate > todayStr ? maxDate : todayStr;
+
+            setDateFrom(start);
+            setDateTo(end);
+            localStorage.setItem('gantt_date_from', start);
+            localStorage.setItem('gantt_date_to', end);
+          }
+        }
+
         setLoading(false);
       })
       .catch((err) => { console.error(err); setLoading(false); });
@@ -230,9 +253,8 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
   const closePopup = () => { setPopup(null); setEditMode(false); };
   const updateNewRes = (field, value) => setNewResForm((prev) => ({ ...prev, [field]: value }));
 
-// ✅ CODE CORRIGÉ ET COMPATIBLE AXIOS
+  // ✅ CODE CORRIGÉ ET COMPATIBLE AXIOS
   const handleCreateReservation = () => {
-    // Vérification : Si la case n'est PAS cochée, le champ ID doit être rempli. Si elle est cochée, le nom est requis.
     if (!isNewClient && !newResForm.client_id) { 
       showToast('Veuillez sélectionner un client', 'error'); 
       return; 
@@ -251,14 +273,12 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
       return; 
     }
 
-    // Vérification des conflits dans la réservation
     const conflict = hasConflict(newResForm.box_id, newResForm.check_in, newResForm.check_out);
     if (conflict) {
       showToast(`❌ Conflit : Box occupé par ${getAnimalName(conflict.animal_id)} du ${displayDate(conflict.check_in)} au ${displayDate(conflict.check_out)}`, 'error');
       return;
     }
 
-    // Préparation des données pour le serveur
     const payload = {
       ...newResForm,
       is_new_client: isNewClient,
@@ -273,7 +293,6 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
         fetchData(); 
         showToast('Réservation créée !'); 
 
-        // Réinitialisation des formulaires
         setIsNewClient(false);
         setIsNewAnimal(false);
         setNewClientData({ name: '', phone: '', email: '' });
@@ -318,16 +337,13 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
   const colWidth = 40;
   const todayIndex = dates.indexOf(todayStr);
 
-  // Filtrage par recherche - version robuste
   const filteredBoxes = boxes.filter((box) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
     if (box.box_number.toLowerCase().includes(q)) return true;
     if (box.box_type && box.box_type.toLowerCase().includes(q)) return true;
-    // recherche directe dans les animaux / clients
     const matchingAnimalIds = animals.filter((a) => (a.name || '').toLowerCase().includes(q)).map((a) => String(a.id));
     const matchingClientIds = clients.filter((c) => (c.name || '').toLowerCase().includes(q)).map((c) => String(c.id));
-    // cherche dans les réservations de ce box
     const hasMatchingRes = reservations.some((r) => {
       if (String(r.box_id) !== String(box.id)) return false;
       if (matchingAnimalIds.includes(String(r.animal_id))) return true;
@@ -416,8 +432,6 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
 
         {/* Séparateur */}
         <div style={{ borderLeft: '1px solid #e2e8f0', height: 24 }}></div>
-
-       
 
         {/* Navigateur mois */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: '#f1f5f9', borderRadius: 8, padding: '2px 4px' }}>
@@ -633,13 +647,11 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                     );
                   })}
                   {br.map((res) => {
-                    // filtre recherche aussi sur les barres - version robuste
                     if (searchQuery.trim()) {
                       const q = searchQuery.toLowerCase().trim();
                       const animalName = getAnimalName(res.animal_id).toLowerCase();
                       const clientName = getClientName(res.client_id).toLowerCase();
                       const matching = animalName.includes(q) || clientName.includes(q);
-                      // fallback avec IDs directs
                       const matchingAnimalIds = animals.filter((a) => (a.name || '').toLowerCase().includes(q)).map((a) => String(a.id));
                       const matchingClientIds = clients.filter((c) => (c.name || '').toLowerCase().includes(q)).map((c) => String(c.id));
                       const isMatch = matching || matchingAnimalIds.includes(String(res.animal_id)) || matchingClientIds.includes(String(res.client_id));
@@ -682,7 +694,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
         </div>
       </div>}
 
-{/* ═══ POPUPS ═══ */}
+      {/* ═══ POPUPS ═══ */}
       {popup && popup.type === 'new' && (
         <div style={ss.overlay} onClick={closePopup}>
           <div style={ss.modal} onClick={(e) => e.stopPropagation()}>
@@ -695,7 +707,6 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
             </div>
             <div style={ss.modalBody}>
 
-              {/* SECTION CLIENT (Sélection ou Création) */}
               <div style={ss.formGroup}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <label style={ss.label}>Client *</label>
@@ -746,7 +757,6 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                 )}
               </div>
 
-              {/* SECTION ANIMAL (Sélection ou Création) */}
               <div style={ss.formGroup}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <label style={ss.label}>Animal *</label>
