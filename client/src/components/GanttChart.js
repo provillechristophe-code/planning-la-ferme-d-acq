@@ -117,25 +117,47 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
         setClients(r[2].data || []);
         setBoxes(r[3].data || []);
 
-        // Ajustement automatique des dates de début et fin si des réservations existent
-        const activeRes = resList.filter((res) => res.status !== 'cancelled');
-        if (activeRes.length > 0) {
-          const checkIns = activeRes.map((res) => res.check_in).filter(Boolean);
-          const checkOuts = activeRes.map((res) => res.check_out).filter(Boolean);
+        // Ajustement automatique des dates pour afficher uniquement les réservations en cours et à venir
+        const currentAndUpcomingRes = resList.filter(
+          (res) => res.status !== 'cancelled' && res.check_out >= todayStr
+        );
+
+        if (currentAndUpcomingRes.length > 0) {
+          const checkIns = currentAndUpcomingRes.map((res) => res.check_in).filter(Boolean);
+          const checkOuts = currentAndUpcomingRes.map((res) => res.check_out).filter(Boolean);
+
           if (checkIns.length > 0 && checkOuts.length > 0) {
             checkIns.sort();
             checkOuts.sort();
+
             const minDate = checkIns[0];
             const maxDate = checkOuts[checkOuts.length - 1];
-            
+
+            // Début : le plus tôt entre aujourd'hui et la plus ancienne réservation en cours/à venir
             const start = minDate < todayStr ? minDate : todayStr;
-            const end = maxDate > todayStr ? maxDate : todayStr;
+
+            // Fin : au moins 30 jours après aujourd'hui ou la date de départ la plus éloignée
+            const defaultEnd = new Date(today);
+            defaultEnd.setDate(defaultEnd.getDate() + 30);
+            const defaultEndStr = formatDate(defaultEnd);
+
+            const end = maxDate > defaultEndStr ? maxDate : defaultEndStr;
 
             setDateFrom(start);
             setDateTo(end);
             localStorage.setItem('gantt_date_from', start);
             localStorage.setItem('gantt_date_to', end);
           }
+        } else {
+          // Si aucune réservation en cours ou à venir, afficher à partir d'aujourd'hui sur 30 jours
+          const defaultEnd = new Date(today);
+          defaultEnd.setDate(defaultEnd.getDate() + 30);
+          const defaultEndStr = formatDate(defaultEnd);
+
+          setDateFrom(todayStr);
+          setDateTo(defaultEndStr);
+          localStorage.setItem('gantt_date_from', todayStr);
+          localStorage.setItem('gantt_date_to', defaultEndStr);
         }
 
         setLoading(false);
@@ -503,13 +525,13 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                   <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Statut</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>🐾 Animal</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>👤 Client</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📦 Box</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📅 Arrivée</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📅 Départ</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>⏱ Durée</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>💰 Total</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Actions</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>👤 Client</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📦 Box</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📅 Arrivée</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>📅 Départ</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>⏱ Durée</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>💰 Total</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'center', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -961,7 +983,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 16 }}>{getAnimalSpecies(tooltip.reservation.animal_id) === 'chat' || getAnimalSpecies(tooltip.reservation.animal_id) === 'Chat' ? '🐱' : '🐶'}</span>
             <span style={{ fontWeight: 800, fontSize: 13 }}>{getAnimalName(tooltip.reservation.animal_id)}</span>
-            <span style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: tooltip.reservation.status === 'confirmed' ? '#10b981' : tooltip.reservation.status === 'pending' ? '#ec4899' : '#64748b' }}>{getStatusLabel(tooltip.reservation.status)}</span>
+            <span style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight 700, background: tooltip.reservation.status === 'confirmed' ? '#10b981' : tooltip.reservation.status === 'pending' ? '#ec4899' : '#64748b' }}>{getStatusLabel(tooltip.reservation.status)}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: '#cbd5e1' }}>
             <div>👤 <span style={{ color: '#fff', fontWeight: 600 }}>{getClientName(tooltip.reservation.client_id)}</span></div>
