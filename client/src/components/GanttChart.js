@@ -526,7 +526,7 @@ function GanttChart({ onViewChange, currentView = 'gantt' }) {
                   <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Box</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Arrivee</th>
                   <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Depart</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Duree</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Duree</th>
                   <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Total</th>
                   <th style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>Actions</th>
                 </tr>
